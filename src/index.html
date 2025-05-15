@@ -1,0 +1,2331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Olongapo Running Map</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""/>
+    
+    <!-- Leaflet JavaScript -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""></script>
+    
+    <!-- Leaflet Control Geocoder for location search -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
+    <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+    
+    <!-- Leaflet Polyline Decorator for route arrows -->
+    <script src="https://unpkg.com/leaflet-polylinedecorator@1.6.0/dist/leaflet.polylineDecorator.js"></script>
+    
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .auth-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
+        #map {
+            height: 500px;
+            width: 100%;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .controls {
+            display: flex;
+            margin-bottom: 15px;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        button {
+            padding: 8px 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        input {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .route-info {
+            margin-top: 15px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
+        .waypoints-list {
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 10px;
+            border: 1px solid #ddd;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .location-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .info-box {
+            padding: 10px;
+            background-color: #e9f7ef;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+        .info-box.warning {
+            background-color: #fcf3cf;
+        }
+        .marker-options {
+            display: none;
+            position: absolute;
+            background: white;
+            border: 1px solid #ccc;
+            padding: 10px;
+            border-radius: 4px;
+            z-index: 1000;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .route-generation, .saved-routes, .tracking-session {
+            margin-top: 15px;
+            padding: 15px;
+            background-color: #f0f8ff;
+            border-radius: 5px;
+            margin-bottom: 15px;
+        }
+        .routes-list {
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 0;
+        }
+        .route-card {
+            padding: 15px;
+            border-bottom: 1px solid #ddd;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: white;
+            transition: background-color 0.2s;
+        }
+        .route-card:hover {
+            background-color: #f5f5f5;
+        }
+        .route-card:last-child {
+            border-bottom: none;
+        }
+        .route-info {
+            flex: 1;
+        }
+        .route-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .route-details {
+            font-size: 12px;
+            color: #666;
+        }
+        .route-actions {
+            display: flex;
+            gap: 5px;
+        }
+        .route-actions button {
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+        .route-type-options {
+            display: flex;
+            gap: 10px;
+            margin: 10px 0;
+        }
+        .route-type-button {
+            flex: 1;
+            text-align: center;
+        }
+        select {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: white;
+        }
+        /* Custom markers */
+        .marker-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+            font-weight: bold;
+            color: white;
+        }
+        .marker-icon.start {
+            background-color: #4CAF50;
+            border-radius: 50%;
+            border: 2px solid white;
+        }
+        .marker-icon.end {
+            background-color: #F44336;
+            border-radius: 50%;
+            border: 2px solid white;
+        }
+        .marker-icon.waypoint {
+            background-color: #3388ff;
+            border-radius: 50%;
+            border: 2px solid white;
+            font-size: 10px;
+        }
+        .primary-btn {
+            background-color: #4CAF50;
+        }
+        .danger-btn {
+            background-color: #f44336;
+        }
+        .danger-btn:hover {
+            background-color: #d32f2f;
+        }
+        .tracking-stats {
+            margin-top: 15px;
+            padding: 15px;
+            background-color: white;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        .stat-item {
+            text-align: center;
+            padding: 10px;
+            background-color: #f5f5f5;
+            border-radius: 5px;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        .stat-value {
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .tracking-note {
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+            padding-top: 10px;
+            border-top: 1px solid #eee;
+        }
+        .warning-btn {
+            background-color: #ff9800;
+        }
+        .warning-btn:hover {
+            background-color: #e68a00;
+        }
+        .info-btn {
+            background-color: #2196F3;
+        }
+        .info-btn:hover {
+            background-color: #0b7dda;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Olongapo City Running Map</h1>
+        
+        <div class="auth-section">
+            <h2>Authentication</h2>
+            <div class="controls">
+                <input type="text" id="token-input" placeholder="Enter your JWT token">
+                <button id="auth-button">Authenticate</button>
+            </div>
+            <div id="auth-status">Not authenticated</div>
+        </div>
+        
+        <div class="info-box">
+            <p><strong>Map focused on Olongapo City</strong> - You can use your current location or manually pin locations to create routes.</p>
+        </div>
+        
+        <div class="location-controls">
+            <button id="use-current-location">Use My Current Location</button>
+            <button id="manual-pin-mode">Manual Pin Mode</button>
+            <button id="reset-to-olongapo">Reset to Olongapo City Center</button>
+        </div>
+        
+        <div id="map"></div>
+        
+        <!-- Route Generation Section -->
+        <div class="route-generation">
+            <h3>Generate Route</h3>
+            <p>Generate a running route based on your location</p>
+            
+            <div class="controls">
+                <select id="route-type">
+                    <option value="short">Short Route (2-3km)</option>
+                    <option value="long">Long Route (5-10km)</option>
+                    <option value="loop">Loop Route (Returns to Start)</option>
+                </select>
+                
+                <input type="number" id="max-distance" placeholder="Max distance (km)" min="1" max="20" value="5">
+                
+                <button id="generate-route-btn">Generate Route</button>
+            </div>
+        </div>
+        
+        <!-- Saved Routes Section -->
+        <div class="saved-routes">
+            <h3>My Saved Routes</h3>
+            <div class="controls">
+                <button id="fetch-routes-btn">Fetch My Routes</button>
+                <button id="search-nearby-routes-btn">Find Routes Near Me</button>
+            </div>
+            
+            <div id="routes-container" class="routes-list">
+                <p id="no-routes-message">No saved routes found. Generate and save a route first.</p>
+                <div id="saved-routes-list"></div>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <button id="start-route">Start New Route</button>
+            <button id="clear-route">Clear Route</button>
+            <button id="save-route">Save Route</button>
+        </div>
+        
+        <div class="route-info">
+            <h3>Route Information</h3>
+            <div id="route-stats">
+                <p>Distance: <span id="route-distance">0</span> km</p>
+                <p>Elevation gain: <span id="route-elevation">0</span> m</p>
+            </div>
+            
+            <h3>Waypoints</h3>
+            <div class="waypoints-list" id="waypoints-list">
+                No waypoints added yet.
+            </div>
+        </div>
+
+        <!-- Tracking Session Section -->
+        <div class="tracking-session">
+            <h3>Track Your Activity</h3>
+            <div class="controls">
+                <button id="start-tracking-btn" class="primary-btn">Start Tracking</button>
+                <button id="stop-tracking-btn" class="danger-btn" disabled>Stop Tracking</button>
+                <button id="reset-session-btn" class="warning-btn">Reset Session</button>
+                <button id="simulate-tracking-btn" class="info-btn">Simulate Movement</button>
+            </div>
+            
+            <div id="tracking-stats" class="tracking-stats" style="display: none;">
+                <div class="stat-grid">
+                    <div class="stat-item">
+                        <div class="stat-label">Duration</div>
+                        <div id="tracking-duration" class="stat-value">00:00:00</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Distance</div>
+                        <div id="tracking-distance" class="stat-value">0.0 km</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Pace</div>
+                        <div id="tracking-pace" class="stat-value">--:-- /km</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Speed</div>
+                        <div id="tracking-speed" class="stat-value">0.0 km/h</div>
+                    </div>
+                </div>
+                <div class="tracking-note">
+                    Your location is being tracked to create your activity. Stay on this page while tracking.
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="marker-options" class="marker-options">
+        <button id="add-to-route">Add to Route</button>
+        <button id="cancel-marker">Cancel</button>
+    </div>
+    
+    <script>
+        // Olongapo City coordinates
+        const OLONGAPO_CENTER = [14.8386, 120.2842];
+        const OLONGAPO_BOUNDS = [
+            [14.7886, 120.2342], // Southwest corner
+            [14.8886, 120.3342]  // Northeast corner
+        ];
+        
+        // Initialize map centered on Olongapo City
+        const map = L.map('map', {
+            center: OLONGAPO_CENTER,
+            zoom: 14,
+            maxBounds: L.latLngBounds(OLONGAPO_BOUNDS).pad(0.5), // Add some padding
+            minZoom: 12 // Prevent zooming out too far
+        });
+        
+        // Add OpenStreetMap tiles
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        }).addTo(map);
+        
+        // Add Olongapo boundary indicator
+        L.rectangle(OLONGAPO_BOUNDS, {
+            color: "#3388ff",
+            weight: 2,
+            fillOpacity: 0.05,
+            opacity: 0.5
+        }).addTo(map);
+        
+        // Add search control
+        const geocoder = L.Control.geocoder({
+            defaultMarkGeocode: false,
+            placeholder: "Search for places in Olongapo...",
+            errorMessage: "Nothing found.",
+            geocoder: new L.Control.Geocoder.Nominatim({
+                geocodingQueryParams: {
+                    viewbox: '120.2342,14.7886,120.3342,14.8886', // Olongapo bounds
+                    bounded: 1
+                }
+            })
+        }).on('markgeocode', function(e) {
+            const bbox = e.geocode.bbox;
+            const poly = L.polygon([
+                bbox.getSouthEast(),
+                bbox.getNorthEast(),
+                bbox.getNorthWest(),
+                bbox.getSouthWest()
+            ]);
+            map.fitBounds(poly.getBounds());
+            addTempMarker(e.geocode.center);
+        }).addTo(map);
+        
+        // Variables for route creation
+        let routePoints = [];
+        let routePolyline = null;
+        let markers = [];
+        let arrowDecorators = []; // Track arrow decorators
+        let isCreatingRoute = false;
+        let isManualPinMode = false;
+        let token = null;
+        let tempMarker = null;
+        let currentUserLocation = null;
+        let originalRoutePath = null; // Store the original route
+        let completedPath = null; // Store the completed part of the route
+        
+        // DOM elements
+        const tokenInput = document.getElementById('token-input');
+        const authButton = document.getElementById('auth-button');
+        const authStatus = document.getElementById('auth-status');
+        const startRouteButton = document.getElementById('start-route');
+        const clearRouteButton = document.getElementById('clear-route');
+        const saveRouteButton = document.getElementById('save-route');
+        const routeDistance = document.getElementById('route-distance');
+        const routeElevation = document.getElementById('route-elevation');
+        const waypointsList = document.getElementById('waypoints-list');
+        const useCurrentLocationBtn = document.getElementById('use-current-location');
+        const manualPinModeBtn = document.getElementById('manual-pin-mode');
+        const resetToOlongapoBtn = document.getElementById('reset-to-olongapo');
+        const markerOptions = document.getElementById('marker-options');
+        const addToRouteBtn = document.getElementById('add-to-route');
+        const cancelMarkerBtn = document.getElementById('cancel-marker');
+        const generateRouteBtn = document.getElementById('generate-route-btn');
+        const routeTypeSelect = document.getElementById('route-type');
+        const maxDistanceInput = document.getElementById('max-distance');
+        const fetchRoutesBtn = document.getElementById('fetch-routes-btn');
+        const searchNearbyRoutesBtn = document.getElementById('search-nearby-routes-btn');
+        const savedRoutesList = document.getElementById('saved-routes-list');
+        const noRoutesMessage = document.getElementById('no-routes-message');
+        
+        // DOM elements for tracking
+        const startTrackingBtn = document.getElementById('start-tracking-btn');
+        const stopTrackingBtn = document.getElementById('stop-tracking-btn');
+        const trackingStats = document.getElementById('tracking-stats');
+        const trackingDuration = document.getElementById('tracking-duration');
+        const trackingDistance = document.getElementById('tracking-distance');
+        const trackingPace = document.getElementById('tracking-pace');
+        const trackingSpeed = document.getElementById('tracking-speed');
+        
+        // Variables for tracking
+        let isTracking = false;
+        let trackingStartTime = null;
+        let trackingTimer = null;
+        let locationUpdateTimer = null;
+        let currentSessionId = null;
+        let totalDuration = 0;
+        let totalDistance = 0;
+        let currentSpeed = 0;
+        let locationHistory = [];
+        let lastLocation = null;
+        
+        // Authentication
+        authButton.addEventListener('click', () => {
+            token = tokenInput.value.trim();
+            if (token) {
+                // Validate token (this is a simple check, you would typically verify with your backend)
+                try {
+                    const parts = token.split('.');
+                    if (parts.length === 3) {
+                        authStatus.innerHTML = 'Authenticated successfully';
+                        authStatus.style.color = 'green';
+                    } else {
+                        throw new Error('Invalid token format');
+                    }
+                } catch (error) {
+                    authStatus.innerHTML = 'Invalid token format';
+                    authStatus.style.color = 'red';
+                    token = null;
+                }
+            } else {
+                authStatus.innerHTML = 'Please enter a token';
+                authStatus.style.color = 'red';
+            }
+        });
+        
+        // Function to get user's location with high accuracy
+        function getUserLocation() {
+            return new Promise((resolve, reject) => {
+                if (!navigator.geolocation) {
+                    reject(new Error('Geolocation is not supported by your browser'));
+                    return;
+                }
+                
+                // Request with high accuracy
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        try {
+                            const { latitude, longitude, accuracy } = position.coords;
+                            
+                            // Validate coordinates
+                            if (isNaN(latitude) || isNaN(longitude) || 
+                                latitude < -90 || latitude > 90 || 
+                                longitude < -180 || longitude > 180) {
+                                reject(new Error(`Invalid coordinates received: ${latitude}, ${longitude}`));
+                                return;
+                            }
+                            
+                            // Log location information
+                            console.log("Got user location:", { 
+                                lat: latitude, 
+                                lng: longitude, 
+                                accuracy: accuracy 
+                            });
+                            
+                            resolve({ 
+                                lat: parseFloat(latitude.toFixed(7)), 
+                                lng: parseFloat(longitude.toFixed(7)),
+                                accuracy 
+                            });
+                        } catch (error) {
+                            console.error("Error processing geolocation data:", error);
+                            reject(new Error('Error processing location data'));
+                        }
+                    },
+                    (error) => {
+                        console.error('Geolocation error:', error);
+                        let errorMessage = 'Unknown location error';
+                        
+                        // Provide more detailed error messages
+                        switch(error.code) {
+                            case error.PERMISSION_DENIED:
+                                errorMessage = 'Location permission denied. Please allow location access.';
+                                break;
+                            case error.POSITION_UNAVAILABLE:
+                                errorMessage = 'Location information is unavailable. Try again later.';
+                                break;
+                            case error.TIMEOUT:
+                                errorMessage = 'Location request timed out. Try again.';
+                                break;
+                        }
+                        
+                        reject(new Error(errorMessage));
+                    },
+                    { 
+                        enableHighAccuracy: true,
+                        timeout: 10000,
+                        maximumAge: 0
+                    }
+                );
+            });
+        }
+        
+        // Use current location with improved accuracy
+        useCurrentLocationBtn.addEventListener('click', () => {
+                useCurrentLocationBtn.disabled = true;
+                useCurrentLocationBtn.textContent = 'Getting location...';
+                
+            getUserLocation()
+                .then(location => {
+                    const { lat, lng } = location;
+                    currentUserLocation = [lat, lng];
+                        
+                        // Check if location is within Olongapo boundaries
+                    if (isInOlongapoBounds([lat, lng])) {
+                        map.setView([lat, lng], 16);
+                            
+                            // Add a marker at the current location
+                            if (tempMarker) {
+                                map.removeLayer(tempMarker);
+                            }
+                            
+                        tempMarker = L.marker([lat, lng]).addTo(map)
+                                .bindPopup('Your current location')
+                                .openPopup();
+                            
+                            if (isCreatingRoute) {
+                            showMarkerOptions([lat, lng]);
+                            }
+                        } else {
+                            alert('Your current location is outside Olongapo City boundaries.');
+                            map.setView(OLONGAPO_CENTER, 14);
+                        }
+                        
+                        useCurrentLocationBtn.disabled = false;
+                        useCurrentLocationBtn.textContent = 'Use My Current Location';
+                })
+                .catch(error => {
+                        alert('Unable to get your current location: ' + error.message);
+                        useCurrentLocationBtn.disabled = false;
+                        useCurrentLocationBtn.textContent = 'Use My Current Location';
+                });
+        });
+        
+        // Manual pin mode toggle
+        manualPinModeBtn.addEventListener('click', () => {
+            isManualPinMode = !isManualPinMode;
+            
+            if (isManualPinMode) {
+                manualPinModeBtn.textContent = 'Exit Manual Pin Mode';
+                manualPinModeBtn.style.backgroundColor = '#ff9800';
+                map.on('click', manualPinPoint);
+            } else {
+                manualPinModeBtn.textContent = 'Manual Pin Mode';
+                manualPinModeBtn.style.backgroundColor = '#4CAF50';
+                map.off('click', manualPinPoint);
+                if (tempMarker) {
+                    map.removeLayer(tempMarker);
+                    tempMarker = null;
+                }
+            }
+        });
+        
+        // Reset to Olongapo
+        resetToOlongapoBtn.addEventListener('click', () => {
+            map.setView(OLONGAPO_CENTER, 14);
+        });
+        
+        // Start route creation
+        startRouteButton.addEventListener('click', () => {
+            if (token) {
+                isCreatingRoute = true;
+                clearRoute();
+                startRouteButton.textContent = 'Adding Route (Add Points)';
+                startRouteButton.style.backgroundColor = '#ff9800';
+            } else {
+                alert('Please authenticate first');
+            }
+        });
+        
+        // Clear route
+        clearRouteButton.addEventListener('click', clearRoute);
+        
+        // Save route
+        saveRouteButton.addEventListener('click', saveRoute);
+        
+        // Add to route from manual pin
+        addToRouteBtn.addEventListener('click', () => {
+            if (tempMarker && isCreatingRoute) {
+                const latLng = tempMarker.getLatLng();
+                addRoutePoint({ latlng: latLng });
+                hideMarkerOptions();
+            }
+        });
+        
+        // Cancel marker
+        cancelMarkerBtn.addEventListener('click', () => {
+            if (tempMarker) {
+                map.removeLayer(tempMarker);
+                tempMarker = null;
+            }
+            hideMarkerOptions();
+        });
+        
+        // Generate route button
+        generateRouteBtn.addEventListener('click', () => {
+            if (!token) {
+                alert('Please authenticate first before generating a route');
+                return;
+            }
+            
+            // Get user location - either from current location or map center
+            let latitude, longitude;
+            if (currentUserLocation) {
+                [latitude, longitude] = currentUserLocation;
+            } else if (tempMarker) {
+                const latLng = tempMarker.getLatLng();
+                latitude = latLng.lat;
+                longitude = latLng.lng;
+            } else {
+                const center = map.getCenter();
+                latitude = center.lat;
+                longitude = center.lng;
+            }
+            
+            const routeType = routeTypeSelect.value;
+            const maxDistance = maxDistanceInput.value;
+            
+            // Show loading state
+            generateRouteBtn.disabled = true;
+            generateRouteBtn.textContent = 'Generating...';
+            
+            // Call the API to generate a route
+            fetch('/api/generate-route', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    latitude,
+                    longitude,
+                    type: routeType,
+                    maxDistance
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Failed to generate route');
+                }
+                return response.json();
+            })
+            .then(data => {
+                // Display the generated route
+                if (data.success && data.data) {
+                    displayGeneratedRoute(data.data);
+                    console.log('Route data:', data.data);
+                } else {
+                    throw new Error('Invalid response format');
+                }
+                generateRouteBtn.disabled = false;
+                generateRouteBtn.textContent = 'Generate Route';
+            })
+            .catch(error => {
+                console.error('Error generating route:', error);
+                
+                // For testing/demo purposes, generate a route locally
+                let mockRoute;
+                const mockDistance = parseFloat(maxDistance) || 5;
+                
+                if (routeType === 'short') {
+                    mockRoute = generateMockRoute(latitude, longitude, Math.min(mockDistance, 3), true);
+                } else if (routeType === 'long') {
+                    mockRoute = generateMockRoute(latitude, longitude, Math.min(mockDistance, 10), false);
+                } else {
+                    mockRoute = generateMockRoute(latitude, longitude, Math.min(mockDistance, 8), true);
+                }
+                
+                displayGeneratedRoute(mockRoute);
+                alert('Generated a mock route - server request failed: ' + error.message);
+                
+                generateRouteBtn.disabled = false;
+                generateRouteBtn.textContent = 'Generate Route';
+            });
+        });
+        
+        // Function to display a generated route
+        function displayGeneratedRoute(routeData) {
+            // Clear any existing route
+            clearRoute();
+            
+            // Extract coordinates
+            const pathCoordinates = routeData.path.coordinates;
+            
+            // Convert from GeoJSON format [lng, lat] to leaflet format [lat, lng]
+            const points = pathCoordinates.map(coord => [coord[1], coord[0]]);
+            
+            // Store the original route points for reference
+            originalRoutePath = [...points];
+            
+            // Add points to route
+            routePoints = points;
+            
+            // Add markers for start and end
+            const startMarker = L.marker(points[0], {
+                icon: L.divIcon({
+                    className: 'custom-marker start-marker',
+                    html: '<div class="marker-icon start"><i class="fa fa-flag"></i></div>',
+                    iconSize: [30, 30],
+                    iconAnchor: [15, 30]
+                })
+            }).addTo(map);
+            startMarker.bindTooltip('Start', { permanent: false, direction: 'top' });
+            
+            const endMarker = L.marker(points[points.length - 1], {
+                icon: L.divIcon({
+                    className: 'custom-marker end-marker',
+                    html: '<div class="marker-icon end"><i class="fa fa-flag-checkered"></i></div>',
+                    iconSize: [30, 30],
+                    iconAnchor: [15, 30]
+                })
+            }).addTo(map);
+            endMarker.bindTooltip('End', { permanent: false, direction: 'top' });
+            
+            markers.push(startMarker, endMarker);
+            
+            // For loop routes, only show start marker if start and end are the same point
+            if (routeData.title === 'Loop Route' || 
+                (points[0][0] === points[points.length-1][0] && 
+                 points[0][1] === points[points.length-1][1])) {
+                map.removeLayer(endMarker);
+                markers.pop();
+            }
+            
+            // Don't add intermediate markers for road routes as they have many points
+            // Only add for the algorithmic routes which have fewer points
+            if (points.length < 20) {
+                // Add intermediate markers
+                for (let i = 1; i < points.length - 1; i++) {
+                    const marker = L.marker(points[i], {
+                        icon: L.divIcon({
+                            className: 'custom-marker waypoint-marker',
+                            html: `<div class="marker-icon waypoint">${i}</div>`,
+                            iconSize: [20, 20],
+                            iconAnchor: [10, 10]
+                        })
+                    }).addTo(map);
+                    markers.push(marker);
+                }
+            }
+            
+            // Create polyline with arrow decorations
+            routePolyline = L.polyline(points, { 
+                color: '#3388ff', 
+                weight: 4,
+                opacity: 0.8,
+                lineJoin: 'round',
+                lineCap: 'round'
+            }).addTo(map);
+            
+            // Add arrow decoration to show direction
+            const arrowDecorator = L.polylineDecorator(routePolyline, {
+                patterns: [
+                    {
+                        offset: '5%', 
+                        repeat: '10%', 
+                        symbol: L.Symbol.arrowHead({
+                            pixelSize: 12,
+                            polygon: false,
+                            pathOptions: {
+                                stroke: true,
+                                color: '#3388ff',
+                                weight: 3
+                            }
+                        })
+                    }
+                ]
+            }).addTo(map);
+            
+            // Track the decorator so we can remove it later
+            arrowDecorators.push(arrowDecorator);
+            
+            // Fit map to route bounds with padding
+            map.fitBounds(routePolyline.getBounds(), {
+                padding: [50, 50]
+            });
+            
+            // Update route information
+            routeDistance.textContent = routeData.distance;
+            routeElevation.textContent = routeData.elevationGain;
+            
+            // Update waypoints list
+            updateWaypointsList();
+        }
+        
+        // Generate a mock route for testing client-side
+        function generateMockRoute(lat, lng, distance, isLoop) {
+            const numPoints = isLoop ? 8 : 10;
+            const points = [];
+            
+            // Add start point
+            points.push([lng, lat]);
+            
+            // Generate points in random directions
+            const R = 6371; // Earth radius in km
+            for (let i = 1; i < numPoints; i++) {
+                const angle = Math.random() * 2 * Math.PI;
+                const stepDistance = distance / numPoints * (0.5 + Math.random());
+                
+                // Convert km to radians
+                const angularDistance = stepDistance / R;
+                
+                // Previous point
+                const prevLat = (i === 1 ? lat : points[i-1][1]) * Math.PI / 180;
+                const prevLng = (i === 1 ? lng : points[i-1][0]) * Math.PI / 180;
+                
+                // Calculate new position
+                const newLat = Math.asin(
+                    Math.sin(prevLat) * Math.cos(angularDistance) +
+                    Math.cos(prevLat) * Math.sin(angularDistance) * Math.cos(angle)
+                );
+                
+                const newLng = prevLng + Math.atan2(
+                    Math.sin(angle) * Math.sin(angularDistance) * Math.cos(prevLat),
+                    Math.cos(angularDistance) - Math.sin(prevLat) * Math.sin(newLat)
+                );
+                
+                // Convert to degrees and add to points
+                points.push([
+                    newLng * 180 / Math.PI,
+                    newLat * 180 / Math.PI
+                ]);
+            }
+            
+            // For loop routes, close the loop
+            if (isLoop) {
+                points.push([lng, lat]);
+            }
+            
+            // Calculate actual distance
+            let totalDistance = 0;
+            for (let i = 1; i < points.length; i++) {
+                const p1 = {lat: points[i-1][1], lng: points[i-1][0]};
+                const p2 = {lat: points[i][1], lng: points[i][0]};
+                totalDistance += getDistanceBetweenPoints(p1, p2);
+            }
+            
+            // Format the mock route response
+            return {
+                title: isLoop ? 'Loop Route' : (distance <= 3 ? 'Short Route' : 'Long Route'),
+                description: `Generated ${isLoop ? 'loop' : (distance <= 3 ? 'short' : 'long')} route with distance ${totalDistance.toFixed(2)}km`,
+                distance: parseFloat(totalDistance.toFixed(2)),
+                elevationGain: Math.round(totalDistance * 10),
+                startPoint: {
+                    type: 'Point',
+                    coordinates: points[0]
+                },
+                endPoint: {
+                    type: 'Point',
+                    coordinates: points[points.length - 1]
+                },
+                path: {
+                    type: 'LineString',
+                    coordinates: points
+                }
+            };
+        }
+        
+        // Manual pin point
+        function manualPinPoint(e) {
+            const { lat, lng } = e.latlng;
+            
+            // Check if within Olongapo
+            if (!isInOlongapoBounds([lat, lng])) {
+                alert('Selected location is outside Olongapo City boundaries.');
+                return;
+            }
+            
+            // Remove previous temp marker if exists
+            if (tempMarker) {
+                map.removeLayer(tempMarker);
+            }
+            
+            // Add new marker
+            tempMarker = L.marker([lat, lng]).addTo(map);
+            currentUserLocation = [lat, lng];
+            
+            // If in route creation mode, show marker options
+            if (isCreatingRoute) {
+                showMarkerOptions([lat, lng]);
+            }
+        }
+        
+        // Show marker options popup
+        function showMarkerOptions(position) {
+            // Position the options near the marker but offset
+            const containerPoint = map.latLngToContainerPoint(L.latLng(position));
+            
+            markerOptions.style.display = 'block';
+            markerOptions.style.left = (containerPoint.x + 20) + 'px';
+            markerOptions.style.top = (containerPoint.y - 30) + 'px';
+        }
+        
+        // Hide marker options
+        function hideMarkerOptions() {
+            markerOptions.style.display = 'none';
+        }
+        
+        // Check if point is within Olongapo bounds
+        function isInOlongapoBounds(point) {
+            return point[0] >= OLONGAPO_BOUNDS[0][0] && 
+                   point[0] <= OLONGAPO_BOUNDS[1][0] && 
+                   point[1] >= OLONGAPO_BOUNDS[0][1] && 
+                   point[1] <= OLONGAPO_BOUNDS[1][1];
+        }
+        
+        // Add temp marker for searched locations
+        function addTempMarker(latLng) {
+            if (tempMarker) {
+                map.removeLayer(tempMarker);
+            }
+            
+            tempMarker = L.marker([latLng.lat, latLng.lng]).addTo(map);
+            currentUserLocation = [latLng.lat, latLng.lng];
+            
+            if (isCreatingRoute) {
+                showMarkerOptions([latLng.lat, latLng.lng]);
+            }
+        }
+        
+        // Add point to route
+        function addRoutePoint(e) {
+            if (!isCreatingRoute) return;
+            
+            const { lat, lng } = e.latlng;
+            
+            // Verify within Olongapo bounds
+            if (!isInOlongapoBounds([lat, lng])) {
+                alert('Route points must be within Olongapo City boundaries.');
+                return;
+            }
+            
+            routePoints.push([lat, lng]);
+            
+            // Add marker
+            const marker = L.marker([lat, lng], {
+                icon: L.divIcon({
+                    className: 'custom-marker waypoint-marker',
+                    html: `<div class="marker-icon waypoint">${routePoints.length}</div>`,
+                    iconSize: [20, 20],
+                    iconAnchor: [10, 10]
+                })
+            }).addTo(map);
+            
+            markers.push(marker);
+            
+            // Update polyline
+            if (routePolyline) {
+                map.removeLayer(routePolyline);
+            }
+            
+            // Remove existing decorators
+            arrowDecorators.forEach(decorator => {
+                map.removeLayer(decorator);
+            });
+            arrowDecorators = [];
+            
+            routePolyline = L.polyline(routePoints, { 
+                color: '#3388ff', 
+                weight: 4,
+                opacity: 0.8,
+                lineJoin: 'round',
+                lineCap: 'round'
+            }).addTo(map);
+            
+            // Only add arrows if we have at least 2 points
+            if (routePoints.length >= 2) {
+                const arrowDecorator = L.polylineDecorator(routePolyline, {
+                    patterns: [
+                        {
+                            offset: '5%', 
+                            repeat: '10%', 
+                            symbol: L.Symbol.arrowHead({
+                                pixelSize: 12,
+                                polygon: false,
+                                pathOptions: {
+                                    stroke: true,
+                                    color: '#3388ff',
+                                    weight: 3
+                                }
+                            })
+                        }
+                    ]
+                }).addTo(map);
+                
+                arrowDecorators.push(arrowDecorator);
+            }
+            
+            // Update route information
+            updateRouteInfo();
+            
+            // Update waypoints list
+            updateWaypointsList();
+        }
+        
+        // Clear the current route
+        function clearRoute() {
+            routePoints = [];
+            
+            if (routePolyline) {
+                map.removeLayer(routePolyline);
+                routePolyline = null;
+            }
+            
+            // Remove all arrow decorators
+            arrowDecorators.forEach(decorator => {
+                map.removeLayer(decorator);
+            });
+            arrowDecorators = [];
+            
+            markers.forEach(marker => map.removeLayer(marker));
+            markers = [];
+            
+            routeDistance.textContent = '0';
+            routeElevation.textContent = '0';
+            waypointsList.innerHTML = 'No waypoints added yet.';
+            
+            if (!isCreatingRoute) {
+                startRouteButton.textContent = 'Start New Route';
+                startRouteButton.style.backgroundColor = '#4CAF50';
+            }
+            
+            hideMarkerOptions();
+        }
+        
+        // Save the current route
+        function saveRoute() {
+            if (routePoints.length < 2) {
+                alert('Please create a route with at least 2 points');
+                return;
+            }
+            
+            if (!token) {
+                alert('Please authenticate first');
+                return;
+            }
+            
+            const title = prompt('Enter a name for this route:', 'Olongapo Route ' + new Date().toLocaleDateString());
+            
+            if (!title) {
+                return; // User cancelled
+            }
+            
+            const routeData = {
+                title: title,
+                description: `Route in Olongapo created on ${new Date().toLocaleDateString()}`,
+                path: {
+                    type: 'LineString',
+                    coordinates: routePoints.map(point => [point[1], point[0]]) // Convert to [lng, lat] format for GeoJSON
+                },
+                distance: calculateDistance(routePoints),
+                elevationGain: Math.round(calculateDistance(routePoints) * 8) // Simple elevation estimation
+            };
+            
+            saveRouteButton.disabled = true;
+            saveRouteButton.textContent = 'Saving...';
+            
+            // Send data to backend
+            fetch('/api/routes', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(routeData)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Failed to save route');
+                }
+                return response.json();
+            })
+            .then(data => {
+                alert('Route saved successfully!');
+                console.log('Saved route:', data);
+                isCreatingRoute = false;
+                startRouteButton.textContent = 'Start New Route';
+                startRouteButton.style.backgroundColor = '#4CAF50';
+                
+                // Refresh the routes list
+                fetchRoutesBtn.click();
+            })
+            .catch(error => {
+                console.error('Error saving route:', error);
+                alert('Error saving route: ' + error.message);
+            })
+            .finally(() => {
+                saveRouteButton.disabled = false;
+                saveRouteButton.textContent = 'Save Route';
+            });
+        }
+        
+        // Calculate route distance in kilometers
+        function calculateDistance(points) {
+            let distance = 0;
+            for (let i = 1; i < points.length; i++) {
+                distance += getDistanceBetweenPoints(points[i-1], points[i]);
+            }
+            return distance.toFixed(2);
+        }
+        
+        // Calculate distance between two points using the Haversine formula
+        function getDistanceBetweenPoints(point1, point2) {
+            const R = 6371; // Earth's radius in km
+            
+            const lat1 = point1[0] * Math.PI / 180;
+            const lat2 = point2[0] * Math.PI / 180;
+            const dLat = (point2[0] - point1[0]) * Math.PI / 180;
+            const dLon = (point2[1] - point1[1]) * Math.PI / 180;
+            
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1) * Math.cos(lat2) *
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            const distance = R * c;
+            
+            return distance;
+        }
+        
+        // Update route information display
+        function updateRouteInfo() {
+            const distance = calculateDistance(routePoints);
+            routeDistance.textContent = distance;
+            
+            // For Olongapo area, adjust the elevation model
+            // Actual elevation would come from a proper API
+            const baseElevation = 15; // Rough base elevation in meters for Olongapo
+            const elevation = (baseElevation + distance * 8).toFixed(0);
+            routeElevation.textContent = elevation;
+        }
+        
+        // Update waypoints list display
+        function updateWaypointsList() {
+            if (routePoints.length === 0) {
+                waypointsList.innerHTML = 'No waypoints added yet.';
+                return;
+            }
+            
+            waypointsList.innerHTML = '';
+            routePoints.forEach((point, index) => {
+                const listItem = document.createElement('div');
+                listItem.textContent = `Point ${index + 1}: [${point[0].toFixed(6)}, ${point[1].toFixed(6)}]`;
+                waypointsList.appendChild(listItem);
+            });
+        }
+        
+        // Try to get user's initial location with high accuracy
+        document.addEventListener('DOMContentLoaded', () => {
+            // Check if user has granted location permissions before
+            if (navigator.permissions) {
+                navigator.permissions.query({ name: 'geolocation' })
+                    .then(permissionStatus => {
+                        if (permissionStatus.state === 'granted') {
+                            getUserLocation()
+                                .then(location => {
+                                    const { lat, lng } = location;
+                                    currentUserLocation = [lat, lng];
+                                    
+                                    // Only center on user location if within Olongapo
+                                    if (isInOlongapoBounds([lat, lng])) {
+                                        map.setView([lat, lng], 16);
+                                        L.marker([lat, lng], {
+                                            icon: L.divIcon({
+                                                className: 'custom-marker current-location-marker',
+                                                html: '<div class="marker-icon start"><i class="fa fa-location-dot"></i></div>',
+                                                iconSize: [30, 30],
+                                                iconAnchor: [15, 15]
+                                            })
+                                        }).addTo(map)
+                                            .bindPopup('Your current location')
+                                            .openPopup();
+                                    }
+                                })
+                                .catch(error => {
+                                    console.log('Location access error:', error);
+                                });
+                        }
+                    });
+            } else {
+                // Fallback for browsers that don't support permissions API
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const { latitude, longitude } = position.coords;
+                        currentUserLocation = [latitude, longitude];
+                    
+                    // Only center on user location if within Olongapo
+                        if (isInOlongapoBounds([latitude, longitude])) {
+                            map.setView([latitude, longitude], 16);
+                            L.marker([latitude, longitude]).addTo(map)
+                            .bindPopup('Your current location')
+                            .openPopup();
+                    }
+                },
+                (error) => {
+                    console.log('Location not available or denied, using Olongapo center');
+                }
+            );
+        }
+        });
+
+        // Fetch user's saved routes
+        fetchRoutesBtn.addEventListener('click', () => {
+            if (!token) {
+                alert('Please authenticate first');
+                return;
+            }
+            
+            fetchRoutesBtn.disabled = true;
+            fetchRoutesBtn.textContent = 'Loading...';
+            
+            fetch('/api/routes', {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Failed to fetch routes');
+                }
+                return response.json();
+            })
+            .then(data => {
+                displaySavedRoutes(data.data);
+                fetchRoutesBtn.disabled = false;
+                fetchRoutesBtn.textContent = 'Fetch My Routes';
+            })
+            .catch(error => {
+                console.error('Error fetching routes:', error);
+                alert('Error fetching routes: ' + error.message);
+                fetchRoutesBtn.disabled = false;
+                fetchRoutesBtn.textContent = 'Fetch My Routes';
+            });
+        });
+
+        // Search for routes near current location
+        searchNearbyRoutesBtn.addEventListener('click', () => {
+            if (!currentUserLocation) {
+                alert('Please get your current location first');
+                return;
+            }
+            
+            const [lat, lng] = currentUserLocation;
+            searchNearbyRoutesBtn.disabled = true;
+            searchNearbyRoutesBtn.textContent = 'Searching...';
+            
+            fetch(`/api/routes/nearby?latitude=${lat}&longitude=${lng}&maxDistance=10`, {
+                method: 'GET'
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Failed to fetch nearby routes');
+                }
+                return response.json();
+            })
+            .then(data => {
+                displaySavedRoutes(data.data, true);
+                searchNearbyRoutesBtn.disabled = false;
+                searchNearbyRoutesBtn.textContent = 'Find Routes Near Me';
+            })
+            .catch(error => {
+                console.error('Error fetching nearby routes:', error);
+                alert('Error fetching nearby routes: ' + error.message);
+                searchNearbyRoutesBtn.disabled = false;
+                searchNearbyRoutesBtn.textContent = 'Find Routes Near Me';
+            });
+        });
+
+        // Display saved routes
+        function displaySavedRoutes(routes, isNearby = false) {
+            savedRoutesList.innerHTML = '';
+            
+            if (!routes || routes.length === 0) {
+                noRoutesMessage.style.display = 'block';
+                noRoutesMessage.textContent = isNearby ? 
+                    'No routes found near your location.' : 
+                    'No saved routes found. Generate and save a route first.';
+                return;
+            }
+            
+            noRoutesMessage.style.display = 'none';
+            
+            routes.forEach(route => {
+                const routeCard = document.createElement('div');
+                routeCard.className = 'route-card';
+                
+                const routeInfo = document.createElement('div');
+                routeInfo.className = 'route-info';
+                
+                const routeTitle = document.createElement('div');
+                routeTitle.className = 'route-title';
+                routeTitle.textContent = route.title;
+                
+                const routeDetails = document.createElement('div');
+                routeDetails.className = 'route-details';
+                routeDetails.textContent = `Distance: ${route.distance} km | Elevation: ${route.elevationGain} m`;
+                
+                const routeDate = document.createElement('div');
+                routeDate.className = 'route-date';
+                routeDate.textContent = `Created: ${new Date(route.createdAt).toLocaleDateString()}`;
+                
+                routeInfo.appendChild(routeTitle);
+                routeInfo.appendChild(routeDetails);
+                routeInfo.appendChild(routeDate);
+                
+                const routeActions = document.createElement('div');
+                routeActions.className = 'route-actions';
+                
+                const loadButton = document.createElement('button');
+                loadButton.textContent = 'Load Route';
+                loadButton.style.backgroundColor = '#4CAF50';
+                loadButton.addEventListener('click', () => loadSavedRoute(route._id));
+                
+                routeActions.appendChild(loadButton);
+                
+                routeCard.appendChild(routeInfo);
+                routeCard.appendChild(routeActions);
+                
+                savedRoutesList.appendChild(routeCard);
+            });
+        }
+
+        // Load a saved route by ID
+        function loadSavedRoute(routeId) {
+            if (!token) {
+                alert('Please authenticate first');
+                return;
+            }
+            
+            fetch(`/api/routes/${routeId}`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Failed to fetch route');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success && data.data) {
+                    displayGeneratedRoute(data.data);
+                } else {
+                    throw new Error('Invalid response format');
+                }
+            })
+            .catch(error => {
+                console.error('Error loading route:', error);
+                alert('Error loading route: ' + error.message);
+                
+                // For demonstration, use mock data if API fails
+                const mockRoute = {
+                    title: 'Saved Route',
+                    description: 'Mock saved route (API error fallback)',
+                    distance: 5.2,
+                    elevationGain: 45,
+                    path: {
+                        type: 'LineString',
+                        coordinates: [
+                            [120.2842, 14.8386],
+                            [120.2902, 14.8406],
+                            [120.2942, 14.8376],
+                            [120.2882, 14.8356],
+                            [120.2842, 14.8386]
+                        ]
+                    },
+                    startPoint: {
+                        type: 'Point',
+                        coordinates: [120.2842, 14.8386]
+                    },
+                    endPoint: {
+                        type: 'Point',
+                        coordinates: [120.2842, 14.8386]
+                    }
+                };
+                
+                displayGeneratedRoute(mockRoute);
+            });
+        }
+
+        // Start tracking session
+        startTrackingBtn.addEventListener('click', () => {
+            if (!token) {
+                alert('Please authenticate first');
+                return;
+            }
+            
+            if (!currentUserLocation) {
+                alert('Please get your current location first');
+                return;
+            }
+            
+            // Confirm with user
+            if (!confirm('Ready to start tracking your activity?')) {
+                return;
+            }
+            
+            startTrackingBtn.disabled = true;
+            startTrackingBtn.textContent = 'Starting...';
+            
+            // Convert current location to GeoJSON format
+            const [lat, lng] = currentUserLocation;
+            
+            // Add console log to debug location
+            console.log("Starting tracking with location:", { lat, lng });
+            
+            // Start session in database
+            fetch('/api/sessions/start', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    initialLocation: {
+                        coordinates: [parseFloat(lng), parseFloat(lat)] // Ensure coordinates are numbers
+                    },
+                    activityType: 'run'
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    // Get detailed error message from response
+                    return response.json().then(errorData => {
+                        console.error("Server error response:", errorData);
+                        throw new Error(errorData.message || 'Failed to start tracking session');
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    // Session started successfully
+                    currentSessionId = data.data._id;
+                    
+                    // Update UI
+                    startTrackingBtn.textContent = 'Tracking Active';
+                    stopTrackingBtn.disabled = false;
+                    trackingStats.style.display = 'block';
+                    
+                    // Initialize completed path if a route exists
+                    if (routePolyline && originalRoutePath) {
+                        // If there's a route loaded, DON'T change styling immediately 
+                        // We'll only update styling as the user moves
+                        if (completedPath) {
+                            map.removeLayer(completedPath);
+                        }
+                        
+                        // Create empty completed path
+                        completedPath = L.polyline([], {
+                            color: '#32CD32', // Green for completed sections
+                            weight: 5,
+                            opacity: 0.9
+                        }).addTo(map);
+                    }
+                    
+                    // Start tracking
+                    startTracking();
+                } else {
+                    throw new Error(data.message || 'Unknown error starting session');
+                }
+            })
+            .catch(error => {
+                console.error('Error starting tracking session:', error);
+                alert('Error starting tracking: ' + error.message);
+                startTrackingBtn.disabled = false;
+                startTrackingBtn.textContent = 'Start Tracking';
+            });
+        });
+
+        // Stop tracking session
+        stopTrackingBtn.addEventListener('click', () => {
+            if (!isTracking) {
+                return;
+            }
+            
+            // Confirm with user
+            if (!confirm('Are you sure you want to stop tracking?')) {
+                return;
+            }
+            
+            stopTrackingBtn.disabled = true;
+            stopTrackingBtn.textContent = 'Stopping...';
+            
+            // Stop tracking
+            stopTracking();
+            
+            // Ensure minimum distance and duration (required by model validation)
+            if (totalDistance < 0.001) {
+                totalDistance = 0.001; // Minimum distance to pass validation
+            }
+            
+            if (totalDuration < 1) {
+                totalDuration = 1; // Minimum duration to pass validation (1 second)
+            }
+            
+            console.log("Stopping tracking with distance:", totalDistance, "duration:", totalDuration);
+            
+            // Convert location history to GeoJSON format
+            const locationHistoryGeoJSON = locationHistory.map(loc => ({
+                timestamp: loc.timestamp,
+                location: {
+                    type: 'Point',
+                    coordinates: [loc.lng, loc.lat] // GeoJSON format is [longitude, latitude]
+                },
+                speed: loc.speed || 0,
+                elevation: loc.elevation || 0
+            }));
+            
+            // Create route from location history
+            const route = {
+                type: 'LineString',
+                coordinates: locationHistory.map(loc => [loc.lng, loc.lat])
+            };
+            
+            // Stop session in database with guaranteed valid values
+            fetch('/api/sessions/stop', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    finalLocation: {
+                        coordinates: lastLocation ? [lastLocation.lng, lastLocation.lat] : [currentUserLocation[1], currentUserLocation[0]]
+                    },
+                    locationHistory: locationHistoryGeoJSON,
+                    totalDistance: Math.max(totalDistance, 0.001), // Ensure minimum distance
+                    totalDuration: Math.max(totalDuration, 1), // Ensure minimum duration
+                    title: `Run on ${new Date().toLocaleDateString()}`,
+                    activityType: 'run',
+                    averageSpeed: totalDistance / (totalDuration / 3600), // km/h
+                    maxSpeed: locationHistory.reduce((max, loc) => Math.max(max, loc.speed || 0), 0) || 1, // Ensure non-zero
+                    route: route
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(errorData => {
+                        console.error("Server error details:", errorData);
+                        throw new Error(errorData.message || 'Failed to save activity');
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    // Activity saved successfully
+                    alert('Activity saved successfully!');
+                    
+                    // Reset tracking UI
+                    resetTrackingUI();
+                } else {
+                    throw new Error(data.message || 'Unknown error saving activity');
+                }
+            })
+            .catch(error => {
+                console.error('Error saving activity:', error);
+                alert('Error saving activity: ' + error.message);
+                
+                // Reset tracking UI even if there was an error
+                resetTrackingUI();
+            });
+        });
+
+        // Start tracking function
+        function startTracking() {
+            isTracking = true;
+            trackingStartTime = new Date();
+            locationHistory = [];
+            totalDistance = 0;
+            totalDuration = 0;
+            lastLocation = null;
+            
+            // Add initial location to history
+            const [lat, lng] = currentUserLocation;
+            locationHistory.push({
+                lat: lat,
+                lng: lng,
+                timestamp: new Date(),
+                speed: 0,
+                elevation: 0
+            });
+            lastLocation = { lat, lng };
+            
+            // Start duration timer (update every second)
+            trackingTimer = setInterval(updateTrackingDuration, 1000);
+            
+            // Start location updates (every 5 seconds)
+            locationUpdateTimer = setInterval(updateTrackingLocation, 5000);
+            
+            // Draw active route on map
+            updateMapWithTrackingRoute();
+        }
+
+        // Stop tracking function
+        function stopTracking() {
+            isTracking = false;
+            
+            // Stop timers
+            clearInterval(trackingTimer);
+            clearInterval(locationUpdateTimer);
+            
+            trackingTimer = null;
+            locationUpdateTimer = null;
+        }
+
+        // Reset tracking UI
+        function resetTrackingUI() {
+            startTrackingBtn.disabled = false;
+            startTrackingBtn.textContent = 'Start Tracking';
+            stopTrackingBtn.disabled = true;
+            stopTrackingBtn.textContent = 'Stop Tracking';
+            trackingStats.style.display = 'none';
+            trackingDuration.textContent = '00:00:00';
+            trackingDistance.textContent = '0.0 km';
+            trackingPace.textContent = '--:-- /km';
+            trackingSpeed.textContent = '0.0 km/h';
+            
+            currentSessionId = null;
+            isTracking = false;
+        }
+
+        // Update tracking duration
+        function updateTrackingDuration() {
+            if (!isTracking) return;
+            
+            // Calculate duration
+            const now = new Date();
+            totalDuration = Math.floor((now - trackingStartTime) / 1000); // seconds
+            
+            // Format duration as HH:MM:SS
+            const hours = Math.floor(totalDuration / 3600);
+            const minutes = Math.floor((totalDuration % 3600) / 60);
+            const seconds = totalDuration % 60;
+            
+            trackingDuration.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            
+            // Update pace if we have distance
+            if (totalDistance > 0) {
+                // Calculate pace (minutes per km)
+                const paceSeconds = totalDuration / (totalDistance / 1000);
+                const paceMinutes = Math.floor(paceSeconds / 60);
+                const paceRemainingSeconds = Math.floor(paceSeconds % 60);
+                
+                trackingPace.textContent = `${paceMinutes}:${paceRemainingSeconds.toString().padStart(2, '0')} /km`;
+            }
+        }
+
+        // Update tracking location
+        function updateTrackingLocation() {
+            if (!isTracking) return;
+            
+            // Get current location
+            getUserLocation()
+                .then(location => {
+                    const { lat, lng } = location;
+                    const timestamp = new Date();
+                    
+                    // Calculate speed and distance from last point
+                    let speed = 0;
+                    let distanceFromLast = 0;
+                    
+                    if (lastLocation) {
+                        const timeDiff = (timestamp - locationHistory[locationHistory.length - 1].timestamp) / 1000; // seconds
+                        distanceFromLast = getDistanceBetweenPoints(
+                            { lat: lastLocation.lat, lng: lastLocation.lng },
+                            { lat, lng }
+                        );
+                        
+                        // Only add distance if it's reasonable (more than 2 meters but less than 100 meters in 5 seconds)
+                        // This helps filter out GPS noise
+                        if (distanceFromLast > 0.002 && distanceFromLast < 0.1) {
+                            totalDistance += distanceFromLast;
+                            
+                            // Calculate speed in km/h
+                            speed = (distanceFromLast / timeDiff) * 3600; // km/h
+                        } else if (distanceFromLast >= 0.1) {
+                            // If distance is unusually large, it might be GPS error
+                            // Cap the distance added to prevent huge jumps
+                            totalDistance += 0.05; // Add a reasonable 50m
+                            speed = 10; // Set a reasonable speed
+                            console.warn("Large distance detected, possibly GPS error:", distanceFromLast);
+                        }
+                    }
+                    
+            // Update current speed display 
+            currentSpeed = speed;
+            trackingSpeed.textContent = `${speed.toFixed(1)} km/h`;
+            
+            // Update total distance display
+            trackingDistance.textContent = `${totalDistance.toFixed(2)} km`;
+            
+            // Add to location history
+            locationHistory.push({
+                lat,
+                lng,
+                timestamp,
+                speed,
+                elevation: 0 // We'd get this from an elevation API in a real app
+            });
+            
+            lastLocation = { lat, lng };
+            
+            // Update session in database
+            updateSessionInDatabase(lat, lng, speed, totalDistance, totalDuration);
+            
+            // Update map with new route point
+            updateMapWithTrackingRoute();
+        })
+        .catch(error => {
+            console.error('Error updating location:', error);
+        });
+    }
+
+    // Update session in database
+    function updateSessionInDatabase(lat, lng, speed, distance, duration) {
+        if (!currentSessionId || !isTracking) return;
+        
+        fetch('/api/sessions/update', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                location: {
+                    coordinates: [lng, lat] // GeoJSON format is [longitude, latitude]
+                },
+                speed,
+                distance,
+                duration
+            })
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Failed to update session');
+            }
+            return response.json();
+        })
+        .then(data => {
+            // Session updated successfully, no need to do anything
+        })
+        .catch(error => {
+            console.error('Error updating session:', error);
+            // Don't stop tracking on update errors, just log them
+        });
+    }
+
+    // Update map with current tracking route
+    function updateMapWithTrackingRoute() {
+        if (locationHistory.length < 2) return;
+        
+        // Create route points from location history
+        const routePoints = locationHistory.map(loc => [loc.lat, loc.lng]);
+        
+        // If we have enough points, try to snap to roads
+        if (routePoints.length >= 2 && routePoints.length <= 100) {  // Limit to 100 points to avoid oversized requests
+            // Create a waypoints string for the OSRM API
+            const waypoints = routePoints.map(point => `${point[1]},${point[0]}`).join(';');
+            
+            // Use OSRM API to get a road-snapped route
+            fetch(`https://router.project-osrm.org/route/v1/walking/${waypoints}?overview=full&geometries=geojson`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
+                        // Extract the route geometry
+                        const coordinates = data.routes[0].geometry.coordinates;
+                        
+                        // Convert from [lng, lat] to [lat, lng] for Leaflet
+                        const snappedPoints = coordinates.map(coord => [coord[1], coord[0]]);
+                        
+                        // Update the user path
+                        updateTrackingPath(snappedPoints);
+                    } else {
+                        // Fall back to direct line if road-snapping fails
+                        updateTrackingPath(routePoints);
+                    }
+                })
+                .catch(error => {
+                    console.error("Error snapping to roads:", error);
+                    // Fall back to direct line
+                    updateTrackingPath(routePoints);
+                });
+        } else {
+            // Create direct line if too few/many points for road-snapping
+            updateTrackingPath(routePoints);
+        }
+    }
+    
+    // Update the tracking path, preserving original route if it exists
+    function updateTrackingPath(routePoints) {
+        // Preserve the original route display
+        if (originalRoutePath && routePolyline) {
+            // Don't remove the original route, just update the tracking path
+            
+            // Create or update the user tracking path
+            if (completedPath) {
+                completedPath.setLatLngs(routePoints);
+            } else {
+                completedPath = L.polyline(routePoints, { 
+                    color: '#32CD32', // Green for tracking path
+                    weight: 5,
+                    opacity: 0.9,
+                    lineJoin: 'round',
+                    lineCap: 'round'
+                }).addTo(map);
+            }
+            
+            // Update which parts of the original route have been "eaten"
+            updateCompletedRoute(routePoints);
+        } else {
+            // If no original route, just show the tracking line
+            
+            // Clear any existing tracking polyline
+            if (completedPath) {
+                map.removeLayer(completedPath);
+            }
+            
+            // Create new polyline for tracking
+            completedPath = L.polyline(routePoints, { 
+                color: '#ff4500', // Orange-red for active tracking when no route loaded
+                weight: 4,
+                opacity: 0.8,
+                lineJoin: 'round',
+                lineCap: 'round'
+            }).addTo(map);
+            
+            // Add arrow decoration
+            const arrowDecorator = L.polylineDecorator(completedPath, {
+                patterns: [
+                    {
+                        offset: '5%', 
+                        repeat: '10%', 
+                        symbol: L.Symbol.arrowHead({
+                            pixelSize: 12,
+                            polygon: false,
+                            pathOptions: {
+                                stroke: true,
+                                color: '#ff4500',
+                                weight: 3
+                            }
+                        })
+                    }
+                ]
+            }).addTo(map);
+            
+            arrowDecorators.push(arrowDecorator);
+        }
+        
+        // Fit map to bounds
+        if (completedPath) {
+            map.fitBounds(completedPath.getBounds(), {
+                padding: [50, 50]
+            });
+        }
+    }
+    
+    // Update which parts of the original route have been "eaten"
+    function updateCompletedRoute(userPoints) {
+        if (!originalRoutePath || !routePolyline) return;
+        
+        // Get user's latest position
+        const currentPos = userPoints[userPoints.length - 1];
+        
+        // Distance threshold in kilometers to consider a point "visited"
+        const threshold = 0.02; // 20 meters
+        
+        // If original route exists, update its display to show "eaten" portions
+        const visitedSegments = [];
+        
+        // Find all points on the original route that have been "eaten"
+        for (let i = 0; i < originalRoutePath.length; i++) {
+            const routePoint = originalRoutePath[i];
+            
+            // Check if any user position has been close enough to this route point
+            let visited = false;
+            for (let j = 0; j < userPoints.length; j++) {
+                const userPoint = userPoints[j];
+                const distance = getDistanceBetweenPoints(
+                    { lat: routePoint[0], lng: routePoint[1] },
+                    { lat: userPoint[0], lng: userPoint[1] }
+                );
+                
+                if (distance < threshold) {
+                    visited = true;
+                    break;
+                }
+            }
+            
+            if (visited) {
+                visitedSegments.push(i);
+            }
+        }
+        
+        // If any segments visited, update the route display
+        if (visitedSegments.length > 0) {
+            // Generate array indicating which segments are completed (true/false)
+            const routeStatus = Array(originalRoutePath.length).fill(false);
+            visitedSegments.forEach(idx => { routeStatus[idx] = true; });
+            
+            // Update route style to show completed segments
+            // First remove original route display
+            if (routePolyline) {
+                map.removeLayer(routePolyline);
+            }
+            
+            // Re-add with different colors for completed/remaining segments
+            const remainingSegments = [];
+            let currentSegment = [];
+            
+            for (let i = 0; i < originalRoutePath.length; i++) {
+                const point = originalRoutePath[i];
+                
+                if (!routeStatus[i]) {
+                    // This is an unvisited segment
+                    currentSegment.push(point);
+                } else if (currentSegment.length > 0) {
+                    // Just finished a segment
+                    if (currentSegment.length > 1) {
+                        remainingSegments.push([...currentSegment]);
+                    }
+                    currentSegment = [];
+                }
+            }
+            
+            // Add final segment if it exists
+            if (currentSegment.length > 1) {
+                remainingSegments.push(currentSegment);
+            }
+            
+            // Add remaining segments as dashed lines
+            if (remainingSegments.length > 0) {
+                routePolyline = L.polyline(remainingSegments.flat(), { 
+                    color: '#aaaaaa',
+                    dashArray: '5,10',
+                    opacity: 0.6,
+                    weight: 4
+                }).addTo(map);
+            } else {
+                // All segments are visited
+                routePolyline = null;
+            }
+        }
+    }
+
+    // Add event handler for reset button
+    const resetSessionBtn = document.getElementById('reset-session-btn');
+
+    resetSessionBtn.addEventListener('click', () => {
+        if (!token) {
+            alert('Please authenticate first');
+            return;
+        }
+        
+        if (isTracking) {
+            alert('Please stop tracking first');
+            return;
+        }
+        
+        if (!confirm('Are you sure you want to reset any active sessions? This will clear any tracking sessions that might be stuck.')) {
+            return;
+        }
+        
+        resetSessionBtn.disabled = true;
+        resetSessionBtn.textContent = 'Resetting...';
+        
+        // Call a special reset endpoint
+        fetch('/api/sessions/reset', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            alert(data.message || 'Any active sessions have been reset.');
+            resetSessionBtn.disabled = false;
+            resetSessionBtn.textContent = 'Reset Session';
+        })
+        .catch(error => {
+            console.error('Error resetting session:', error);
+            alert('Error resetting sessions: ' + error.message);
+            resetSessionBtn.disabled = false;
+            resetSessionBtn.textContent = 'Reset Session';
+        });
+    });
+
+    // Add simulation functionality
+    const simulateTrackingBtn = document.getElementById('simulate-tracking-btn');
+
+    // Simulation variables
+    let simulationInProgress = false;
+    let simulationInterval = null;
+    let simulationStep = 0;
+
+    simulateTrackingBtn.addEventListener('click', () => {
+        if (!token) {
+            alert('Please authenticate first');
+            return;
+        }
+        
+        if (!originalRoutePath || !routePolyline) {
+            alert('Please generate a route first');
+            return;
+        }
+        
+        if (simulationInProgress) {
+            // Stop simulation
+            clearInterval(simulationInterval);
+            simulationInProgress = false;
+            simulateTrackingBtn.textContent = 'Simulate Movement';
+            return;
+        }
+        
+        if (isTracking) {
+            alert('Already tracking. Please stop tracking before simulating.');
+            return;
+        }
+        
+        // Confirm simulation
+        if (!confirm('This will simulate movement along the route. Continue?')) {
+            return;
+        }
+        
+        // Start tracking session with the first point
+        const firstPoint = originalRoutePath[0];
+        currentUserLocation = firstPoint;
+        
+        // Start a tracking session
+        fetch('/api/sessions/start', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                initialLocation: {
+                    coordinates: [firstPoint[1], firstPoint[0]] // [lng, lat]
+                },
+                activityType: 'run'
+            })
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(errorData => {
+                    throw new Error(errorData.message || 'Failed to start tracking session');
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                // Session started successfully
+                currentSessionId = data.data._id;
+                
+                // Start simulation
+                simulationInProgress = true;
+                simulateTrackingBtn.textContent = 'Stop Simulation';
+                
+                // Initialize simulation variables
+                simulationStep = 0;
+                isTracking = true;
+                trackingStartTime = new Date();
+                locationHistory = [];
+                totalDistance = 0;
+                totalDuration = 0;
+                lastLocation = null;
+                
+                // Show tracking UI
+                trackingStats.style.display = 'block';
+                startTrackingBtn.textContent = 'Simulation Active';
+                startTrackingBtn.disabled = true;
+                stopTrackingBtn.disabled = false;
+                
+                // Start duration timer
+                trackingTimer = setInterval(updateTrackingDuration, 1000);
+                
+                // Add initial location to history
+                const [lat, lng] = firstPoint;
+                locationHistory.push({
+                    lat: lat,
+                    lng: lng,
+                    timestamp: new Date(),
+                    speed: 0,
+                    elevation: 0
+                });
+                lastLocation = { lat, lng };
+                
+                // Simulate movement every 2 seconds
+                simulationInterval = setInterval(() => {
+                    simulateMovement();
+                }, 2000);
+            } else {
+                throw new Error(data.message || 'Unknown error starting simulation');
+            }
+        })
+        .catch(error => {
+            console.error('Error starting simulation:', error);
+            alert('Error starting simulation: ' + error.message);
+            simulationInProgress = false;
+            simulateTrackingBtn.textContent = 'Simulate Movement';
+        });
+    });
+
+    // Function to simulate movement along the route
+    function simulateMovement() {
+        // Move to next point on route
+        simulationStep++;
+        
+        // Check if we've reached the end of the route
+        if (simulationStep >= originalRoutePath.length) {
+            clearInterval(simulationInterval);
+            simulationInProgress = false;
+            simulateTrackingBtn.textContent = 'Simulate Movement';
+            
+            // Automatically stop tracking with valid values
+            stopTracking();
+            
+            // Ensure we have a minimum distance value to avoid validation errors
+            if (totalDistance < 0.001) {
+                totalDistance = 0.001;
+            }
+            
+            // Ensure we have a minimum duration
+            if (totalDuration < 1) {
+                totalDuration = 1;
+            }
+            
+            console.log("Stopping simulation with distance:", totalDistance, "duration:", totalDuration);
+            
+            // Stop session in database with guaranteed valid values
+            fetch('/api/sessions/stop', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    finalLocation: {
+                        coordinates: lastLocation ? [lastLocation.lng, lastLocation.lat] : [currentUserLocation[1], currentUserLocation[0]]
+                    },
+                    locationHistory: locationHistory.map(loc => ({
+                        timestamp: loc.timestamp,
+                        location: {
+                            type: 'Point',
+                            coordinates: [loc.lng, loc.lat]
+                        },
+                        speed: loc.speed || 0,
+                        elevation: loc.elevation || 0
+                    })),
+                    totalDistance: Math.max(totalDistance, 0.001), // Ensure minimum distance
+                    totalDuration: Math.max(totalDuration, 1), // Ensure minimum duration
+                    title: `Simulated Run on ${new Date().toLocaleDateString()}`,
+                    activityType: 'run',
+                    averageSpeed: totalDistance / (totalDuration / 3600), // km/h
+                    maxSpeed: locationHistory.reduce((max, loc) => Math.max(max, loc.speed || 0), 0) || 1, // Ensure non-zero
+                    route: {
+                        type: 'LineString',
+                        coordinates: locationHistory.map(loc => [loc.lng, loc.lat])
+                    }
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(errorData => {
+                        console.error("Server error details:", errorData);
+                        throw new Error(errorData.message || 'Failed to save activity');
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    // Activity saved successfully
+                    alert('Simulation completed and activity saved successfully!');
+                    
+                    // Reset tracking UI
+                    resetTrackingUI();
+                } else {
+                    throw new Error(data.message || 'Unknown error saving activity');
+                }
+            })
+            .catch(error => {
+                console.error('Error saving activity:', error);
+                alert('Error saving activity: ' + error.message);
+                
+                // Reset tracking UI even if there was an error
+                resetTrackingUI();
+            });
+            
+            return;
+        }
+        
+        // Get next point from route
+        const nextPoint = originalRoutePath[simulationStep];
+        const [lat, lng] = nextPoint;
+        
+        // Calculate time and distance
+        const prevLocation = lastLocation;
+        const timestamp = new Date();
+        let speed = 0;
+        let distanceFromLast = 0;
+        
+        if (prevLocation) {
+            const timeDiff = (timestamp - locationHistory[locationHistory.length - 1].timestamp) / 1000; // seconds
+            distanceFromLast = getDistanceBetweenPoints(
+                { lat: prevLocation.lat, lng: prevLocation.lng },
+                { lat, lng }
+            );
+            
+            totalDistance += distanceFromLast;
+            speed = (distanceFromLast / timeDiff) * 3600; // km/h
+        }
+        
+        // Update stats
+        currentSpeed = speed;
+        trackingSpeed.textContent = `${speed.toFixed(1)} km/h`;
+        trackingDistance.textContent = `${totalDistance.toFixed(2)} km`;
+        
+        // Add to location history
+        locationHistory.push({
+            lat,
+            lng,
+            timestamp,
+            speed,
+            elevation: 0
+        });
+        
+        lastLocation = { lat, lng };
+        
+        // Update session in database
+        updateSessionInDatabase(lat, lng, speed, totalDistance, totalDuration);
+        
+        // Update map with new route point
+        updateMapWithTrackingRoute();
+    }
+    </script>
+</body>
+</html>
