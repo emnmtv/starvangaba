@@ -11,6 +11,9 @@ export interface IUser extends Document {
   role: 'USER' | 'ADMIN';
   profilePicture?: string;
   bio?: string;
+  weight?: number; // Weight in kg
+  height?: number; // Height in cm
+  age?: number; // Age in years
   followers: mongoose.Types.ObjectId[];
   following: mongoose.Types.ObjectId[];
   activityPreferences: {
@@ -154,6 +157,9 @@ const UserSchema: Schema = new Schema({
   role: { type: String, enum: ['USER', 'ADMIN'], default: 'USER' },
   profilePicture: { type: String },
   bio: { type: String },
+  weight: { type: Number }, // Weight in kg
+  height: { type: Number }, // Height in cm
+  age: { type: Number }, // Age in years
   followers: [{ type: Schema.Types.ObjectId, ref: 'User' }],
   following: [{ type: Schema.Types.ObjectId, ref: 'User' }],
   activityPreferences: {

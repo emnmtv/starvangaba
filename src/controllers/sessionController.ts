@@ -64,9 +64,25 @@ export const startSession = async (req: Request, res: Response): Promise<void> =
     });
     
     if (existingSession) {
-      res.status(400).json({
-        success: false,
-        message: 'You already have an active session',
+      // Reset existing session instead of failing
+      console.log("Resetting existing session:", existingSession._id);
+      
+      // Update the session with new data
+      existingSession.startTime = new Date();
+      existingSession.currentLocation = {
+        type: 'Point',
+        coordinates: initialLocation.coordinates
+      };
+      existingSession.currentSpeed = 0;
+      existingSession.currentDistance = 0;
+      existingSession.currentDuration = 0;
+      existingSession.lastUpdated = new Date();
+      
+      await existingSession.save();
+      
+      res.status(200).json({
+        success: true,
+        message: 'Session reset successfully',
         data: existingSession
       });
       return;
@@ -74,10 +90,11 @@ export const startSession = async (req: Request, res: Response): Promise<void> =
     
     console.log("Creating new session with coordinates:", initialLocation.coordinates);
     
-    // Create a new session
+    // Create a new session with precise timestamps
+    const startTime = new Date();
     const newSession = await ActiveSession.create({
       user: req.user._id,
-      startTime: new Date(),
+      startTime: startTime,
       isActive: true,
       currentLocation: {
         type: 'Point',
@@ -89,12 +106,15 @@ export const startSession = async (req: Request, res: Response): Promise<void> =
       lastUpdated: new Date()
     });
     
-    console.log("New session created:", newSession._id);
+    console.log("New session created:", newSession._id, "at", startTime.toISOString());
     
     res.status(201).json({
       success: true,
       message: 'Session started successfully',
-      data: newSession
+      data: {
+        ...newSession.toObject(),
+        preciseStartTime: startTime.getTime() // send millisecond timestamp for precise timing
+      }
     });
 
   } catch (error) {
@@ -123,7 +143,8 @@ export const updateSession = async (req: Request, res: Response): Promise<void> 
       distance, 
       duration, 
       heartRate, 
-      elevation 
+      elevation,
+      timestamp 
     } = req.body;
     
     // Validate input
@@ -149,6 +170,13 @@ export const updateSession = async (req: Request, res: Response): Promise<void> 
       return;
     }
     
+    // Calculate duration if not provided based on session start time
+    let calculatedDuration = duration;
+    if (calculatedDuration === undefined) {
+      const currentTime = timestamp ? new Date(timestamp) : new Date();
+      calculatedDuration = Math.floor((currentTime.getTime() - session.startTime.getTime()) / 1000);
+    }
+    
     // Update session with new data
     session.currentLocation = {
       type: 'Point',
@@ -157,17 +185,22 @@ export const updateSession = async (req: Request, res: Response): Promise<void> 
     
     if (speed !== undefined) session.currentSpeed = speed;
     if (distance !== undefined) session.currentDistance = distance;
-    if (duration !== undefined) session.currentDuration = duration;
+    if (calculatedDuration !== undefined) session.currentDuration = calculatedDuration;
     if (heartRate !== undefined) session.currentHeartRate = heartRate;
     if (elevation !== undefined) session.currentElevation = elevation;
     
     session.lastUpdated = new Date();
     await session.save();
     
+    // Send back the complete session with precise timestamps
     res.status(200).json({
       success: true,
       message: 'Session updated successfully',
-      data: session
+      data: {
+        ...session.toObject(),
+        elapsedTime: Math.floor((Date.now() - session.startTime.getTime()) / 1000),
+        serverTime: Date.now()
+      }
     });
 
   } catch (error) {
@@ -375,12 +408,28 @@ export const getActiveSession = async (req: Request, res: Response): Promise<voi
 
 // Helper function to estimate calories burned based on activity duration
 function calculateCalories(durationSeconds: number, user: any): number {
-  // Very basic estimation - in a real app, would use weight, height, age, gender, heart rate
+  // Get the duration in hours
   const durationHours = durationSeconds / 3600;
-  const averageMET = 7; // Metabolic Equivalent of Task for running
-  const weightKg = 70; // Default weight if not available
+  
+  // Get user metrics with fallbacks to defaults
+  const weightKg = user && user.weight ? user.weight : 70; // Default weight if not available
+  const age = user && user.age ? user.age : 30; // Default age if not available
+  
+  // Adjust MET value based on age - older individuals generally have lower MET values
+  let averageMET = 7; // Default MET for running at moderate pace
+  
+  // Simple age adjustment: slightly reduce MET for older individuals
+  if (age > 50) {
+    averageMET = 6.5;
+  } else if (age > 65) {
+    averageMET = 6;
+  }
+  
+  // For a more accurate calculation, we could use height to calculate BMR
+  // and incorporate sex/gender, but we'll stick with a weight/age-based approach
   
   // Calories = MET × weight (kg) × duration (hours)
+  // This formula accounts for the user's actual weight and age when available
   return Math.round(averageMET * weightKg * durationHours);
 }
 

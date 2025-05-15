@@ -459,7 +459,7 @@ export const getUserRoutes = async (req: Request, res: Response): Promise<void> 
 
     const routes = await Route.find({ user: req.user._id })
       .sort({ createdAt: -1 })
-      .select('title description distance elevationGain startPoint endPoint createdAt');
+      .select('title description distance elevationGain startPoint endPoint path createdAt');
 
     res.status(200).json({
       success: true,
@@ -506,7 +506,7 @@ export const getRoutesNearLocation = async (req: Request, res: Response): Promis
       isPublic: true
     })
     .limit(10)
-    .select('title description distance elevationGain startPoint endPoint createdAt');
+    .select('title description distance elevationGain startPoint endPoint path createdAt');
 
     res.status(200).json({
       success: true,

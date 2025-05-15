@@ -259,6 +259,43 @@
         .info-btn:hover {
             background-color: #0b7dda;
         }
+        /* Profile form styles */
+        .profile-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #f0f8ff;
+            border-radius: 5px;
+        }
+        .profile-form {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+        .form-group label {
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        #profile-status {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            display: none;
+        }
+        #profile-status.success {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+            display: block;
+        }
+        #profile-status.error {
+            background-color: #ffebee;
+            color: #c62828;
+            display: block;
+        }
     </style>
 </head>
 <body>
@@ -272,6 +309,33 @@
                 <button id="auth-button">Authenticate</button>
             </div>
             <div id="auth-status">Not authenticated</div>
+        </div>
+        
+        <!-- User Profile Section -->
+        <div class="profile-section" style="display: none;">
+            <h2>Your Profile</h2>
+            <p>Update your personal data for more accurate calorie calculations</p>
+            
+            <div class="profile-form">
+                <div class="form-group">
+                    <label for="weight-input">Weight (kg):</label>
+                    <input type="number" id="weight-input" min="30" max="300" placeholder="Your weight in kg">
+                </div>
+                
+                <div class="form-group">
+                    <label for="height-input">Height (cm):</label>
+                    <input type="number" id="height-input" min="100" max="250" placeholder="Your height in cm">
+                </div>
+                
+                <div class="form-group">
+                    <label for="age-input">Age:</label>
+                    <input type="number" id="age-input" min="13" max="120" placeholder="Your age in years">
+                </div>
+                
+                <button id="save-profile-btn" class="primary-btn">Save Profile</button>
+            </div>
+            
+            <div id="profile-status"></div>
         </div>
         
         <div class="info-box">
@@ -468,6 +532,14 @@
         const savedRoutesList = document.getElementById('saved-routes-list');
         const noRoutesMessage = document.getElementById('no-routes-message');
         
+        // DOM elements for profile
+        const profileSection = document.querySelector('.profile-section');
+        const weightInput = document.getElementById('weight-input');
+        const heightInput = document.getElementById('height-input');
+        const ageInput = document.getElementById('age-input');
+        const saveProfileBtn = document.getElementById('save-profile-btn');
+        const profileStatus = document.getElementById('profile-status');
+        
         // DOM elements for tracking
         const startTrackingBtn = document.getElementById('start-tracking-btn');
         const stopTrackingBtn = document.getElementById('stop-tracking-btn');
@@ -499,6 +571,12 @@
                     if (parts.length === 3) {
                         authStatus.innerHTML = 'Authenticated successfully';
                         authStatus.style.color = 'green';
+                        
+                        // Show profile section when authenticated
+                        profileSection.style.display = 'block';
+                        
+                        // Fetch user profile data
+                        fetchUserProfile();
                     } else {
                         throw new Error('Invalid token format');
                     }
@@ -506,12 +584,120 @@
                     authStatus.innerHTML = 'Invalid token format';
                     authStatus.style.color = 'red';
                     token = null;
+                    profileSection.style.display = 'none';
                 }
             } else {
                 authStatus.innerHTML = 'Please enter a token';
                 authStatus.style.color = 'red';
+                profileSection.style.display = 'none';
             }
         });
+        
+        // Fetch user profile data
+        function fetchUserProfile() {
+            if (!token) return;
+            
+            fetch('/api/profile', {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Failed to fetch profile');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success && data.data) {
+                    // Populate profile form fields
+                    const user = data.data;
+                    if (user.weight) weightInput.value = user.weight;
+                    if (user.height) heightInput.value = user.height;
+                    if (user.age) ageInput.value = user.age;
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching profile:', error);
+                // Don't show error to user - just leave form empty
+            });
+        }
+        
+        // Save profile data
+        saveProfileBtn.addEventListener('click', () => {
+            if (!token) {
+                showProfileStatus('Please authenticate first', 'error');
+                return;
+            }
+            
+            // Get form values
+            const weight = weightInput.value ? parseFloat(weightInput.value) : undefined;
+            const height = heightInput.value ? parseFloat(heightInput.value) : undefined;
+            const age = ageInput.value ? parseInt(ageInput.value) : undefined;
+            
+            // Validate inputs
+            if (weight !== undefined && (isNaN(weight) || weight < 30 || weight > 300)) {
+                showProfileStatus('Weight must be between 30 and 300 kg', 'error');
+                return;
+            }
+            
+            if (height !== undefined && (isNaN(height) || height < 100 || height > 250)) {
+                showProfileStatus('Height must be between 100 and 250 cm', 'error');
+                return;
+            }
+            
+            if (age !== undefined && (isNaN(age) || age < 13 || age > 120)) {
+                showProfileStatus('Age must be between 13 and 120 years', 'error');
+                return;
+            }
+            
+            // Prepare data for API call
+            const profileData = {};
+            if (weight !== undefined) profileData.weight = weight;
+            if (height !== undefined) profileData.height = height;
+            if (age !== undefined) profileData.age = age;
+            
+            // Submit profile update
+            fetch('/api/profile', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(profileData)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(errorData => {
+                        throw new Error(errorData.message || 'Failed to update profile');
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    showProfileStatus('Profile updated successfully!', 'success');
+                } else {
+                    throw new Error(data.message || 'Unknown error updating profile');
+                }
+            })
+            .catch(error => {
+                console.error('Error updating profile:', error);
+                showProfileStatus(`Error: ${error.message}`, 'error');
+            });
+        });
+        
+        // Helper to show profile status messages
+        function showProfileStatus(message, type) {
+            profileStatus.textContent = message;
+            profileStatus.className = type;
+            
+            // Hide after 5 seconds
+            setTimeout(() => {
+                profileStatus.style.display = 'none';
+            }, 5000);
+        }
         
         // Function to get user's location with high accuracy
         function getUserLocation() {

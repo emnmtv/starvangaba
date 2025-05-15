@@ -146,3 +146,79 @@ export const loginUser = async (req: Request, res: Response): Promise<void> => {
     });
   }
 };
+
+// Update user profile controller - allows updating weight, height, and other profile info
+export const updateUserProfile = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({
+        success: false,
+        message: 'User not authenticated'
+      });
+      return;
+    }
+
+    const { weight, height, age, firstName, lastName, bio } = req.body;
+    
+    // Validate numeric inputs if provided
+    if (weight !== undefined && (isNaN(weight) || weight <= 0 || weight > 300)) {
+      res.status(400).json({
+        success: false,
+        message: 'Weight must be a positive number between 1 and 300 kg'
+      });
+      return;
+    }
+    
+    if (height !== undefined && (isNaN(height) || height <= 0 || height > 300)) {
+      res.status(400).json({
+        success: false,
+        message: 'Height must be a positive number between 1 and 300 cm'
+      });
+      return;
+    }
+    
+    if (age !== undefined && (isNaN(age) || age < 13 || age > 120)) {
+      res.status(400).json({
+        success: false,
+        message: 'Age must be a number between 13 and 120 years'
+      });
+      return;
+    }
+
+    // Prepare the update object with only fields that are provided
+    const updateData: any = {};
+    if (weight !== undefined) updateData.weight = weight;
+    if (height !== undefined) updateData.height = height;
+    if (age !== undefined) updateData.age = age;
+    if (firstName) updateData.firstName = firstName;
+    if (lastName) updateData.lastName = lastName;
+    if (bio !== undefined) updateData.bio = bio;
+
+    // Update user profile
+    const updatedUser = await User.findByIdAndUpdate(
+      req.user._id,
+      { $set: updateData },
+      { new: true, runValidators: true }
+    ).select('-password');
+
+    if (!updatedUser) {
+      res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Profile updated successfully',
+      data: updatedUser
+    });
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while updating profile'
+    });
+  }
+};

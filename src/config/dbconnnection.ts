@@ -5,7 +5,7 @@ dotenv.config();
 
 const connectDB = async () => {
   try {
-    await mongoose.connect(process.env.MONGO_URI || '');
+    await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/stravangaba');
     console.log('MongoDB connected');
   } catch (err) {
     console.error('MongoDB connection error:', err);
