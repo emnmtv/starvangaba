@@ -143,6 +143,7 @@ export interface IRoute extends Document {
   };
   isPublic: boolean;
   usageCount: number;
+  completed: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -310,6 +311,7 @@ const RouteSchema: Schema = new Schema({
   },
   isPublic: { type: Boolean, default: false },
   usageCount: { type: Number, default: 0 },
+  completed: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 }, {

@@ -34,6 +34,9 @@ app.use(cors({
 // Serve static files from public directory
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Serve uploaded files from uploads directory
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
 // Get server IP addresses
 const getIpAddresses = () => {
   const interfaces = os.networkInterfaces();

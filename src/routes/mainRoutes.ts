@@ -1,5 +1,5 @@
 import express from 'express';
-import { registerUser, loginUser, updateUserProfile } from '../controllers/mainFunctionController';
+import { registerUser, loginUser, updateUserProfile, updateProfilePicture } from '../controllers/mainFunctionController';
 import { 
   generateRouteNearUser, 
   saveRoute, 
@@ -14,7 +14,12 @@ import {
   getActiveSession,
   resetSession
 } from '../controllers/sessionController';
+import {
+  getUserActivities,
+  getActivityById
+} from '../controllers/activityController';
 import { authenticateToken } from '../middleware/authMiddleware';
+import { uploadProfilePicture } from '../middleware/fileHandler';
 
 const router = express.Router();
 
@@ -34,6 +39,8 @@ router.get('/profile', authenticateToken, (req, res) => {
   });
 });
 router.put('/profile', authenticateToken, updateUserProfile);
+// Add the new profile picture upload route
+router.post('/profile/picture', authenticateToken, uploadProfilePicture, updateProfilePicture);
 
 // Route generation and management
 router.post('/generate-route', authenticateToken, generateRouteNearUser);
@@ -41,6 +48,10 @@ router.post('/routes', authenticateToken, saveRoute);
 router.get('/routes', authenticateToken, getUserRoutes);
 router. get('/routes/nearby', getRoutesNearLocation);
 router.get('/routes/:id', authenticateToken, getRouteById);
+
+// Activity routes
+router.get('/activities', authenticateToken, getUserActivities);
+router.get('/activities/:id', authenticateToken, getActivityById);
 
 // Session tracking routes
 router.post('/sessions/start', authenticateToken, startSession);

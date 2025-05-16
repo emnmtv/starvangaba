@@ -3,6 +3,8 @@ import bcrypt from 'bcrypt';
 import { User, IUser } from '../config/database';
 import { generateToken } from '../middleware/authMiddleware';
 import mongoose from 'mongoose';
+import path from 'path';
+import fs from 'fs';
 
 // User registration controller
 export const registerUser = async (req: Request, res: Response): Promise<void> => {
@@ -219,6 +221,96 @@ export const updateUserProfile = async (req: Request, res: Response): Promise<vo
     res.status(500).json({
       success: false,
       message: 'Server error while updating profile'
+    });
+  }
+};
+
+// Update profile picture controller
+export const updateProfilePicture = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({
+        success: false,
+        message: 'User not authenticated'
+      });
+      return;
+    }
+
+    if (!req.file) {
+      res.status(400).json({
+        success: false,
+        message: 'No file uploaded'
+      });
+      return;
+    }
+
+    // Get the file path relative to server
+    const userId = req.user._id.toString();
+    const relativeFilePath = `/uploads/profilepic/${userId}/${req.file.filename}`;
+    const absoluteFilePath = req.file.path;
+
+    // Get the old profile picture path to delete later
+    const user = await User.findById(userId);
+    const oldProfilePicture = user?.profilePicture;
+
+    // Update user's profile picture path in database
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { 
+        $set: { 
+          profilePicture: relativeFilePath 
+        } 
+      },
+      { new: true, runValidators: true }
+    ).select('-password');
+
+    if (!updatedUser) {
+      // If update fails, delete the uploaded file
+      fs.unlinkSync(absoluteFilePath);
+      
+      res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+      return;
+    }
+
+    // Delete old profile picture if it exists
+    if (oldProfilePicture) {
+      const oldFilePath = path.join(__dirname, '../..', oldProfilePicture);
+      try {
+        if (fs.existsSync(oldFilePath)) {
+          fs.unlinkSync(oldFilePath);
+        }
+      } catch (error) {
+        console.error('Error deleting old profile picture:', error);
+        // Continue even if delete fails
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Profile picture updated successfully',
+      data: {
+        user: updatedUser,
+        profilePicture: relativeFilePath
+      }
+    });
+  } catch (error) {
+    console.error('Update profile picture error:', error);
+    
+    // If there was an error, try to delete the uploaded file
+    if (req.file && req.file.path) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch (deleteError) {
+        console.error('Error deleting file after failed update:', deleteError);
+      }
+    }
+    
+    res.status(500).json({
+      success: false,
+      message: 'Server error while updating profile picture'
     });
   }
 };

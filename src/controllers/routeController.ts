@@ -398,7 +398,7 @@ export const saveRoute = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const { title, description, path, distance, elevationGain, startPoint, endPoint } = req.body;
+    const { title, description, path, distance, elevationGain, startPoint, endPoint, completed } = req.body;
 
     // Validate input
     if (!title || !path || !distance) {
@@ -407,6 +407,34 @@ export const saveRoute = async (req: Request, res: Response): Promise<void> => {
         message: 'Please provide title, path and distance'
       });
       return;
+    }
+
+    // If route is marked as completed, check if a similar completed route already exists
+    if (completed) {
+      // Check for similar routes by comparing path coordinates
+      // We'll use the first and last coordinates to identify similar routes
+      const startCoord = path.coordinates[0];
+      const endCoord = path.coordinates[path.coordinates.length - 1];
+      
+      // Find routes by the user with similar start and end points
+      const existingRoutes = await Route.find({
+        user: req.user._id,
+        completed: true,
+        'startPoint.coordinates': { $near: { $geometry: { type: 'Point', coordinates: startCoord }, $maxDistance: 50 } },
+        'endPoint.coordinates': { $near: { $geometry: { type: 'Point', coordinates: endCoord }, $maxDistance: 50 } },
+        distance: { $gte: distance * 0.9, $lte: distance * 1.1 } // Within 10% of the distance
+      });
+
+      if (existingRoutes.length > 0) {
+        // We found a similar completed route
+        res.status(200).json({
+          success: true,
+          message: 'A similar completed route already exists',
+          duplicate: true,
+          data: existingRoutes[0]
+        });
+        return;
+      }
     }
 
     // Create new route
@@ -429,7 +457,8 @@ export const saveRoute = async (req: Request, res: Response): Promise<void> => {
         coordinates: path.coordinates
       },
       isPublic: true,
-      usageCount: 0
+      usageCount: 0,
+      completed: completed || false
     });
 
     res.status(201).json({

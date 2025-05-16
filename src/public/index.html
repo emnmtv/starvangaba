@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Starvangaba API Server</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h1, h2 {
+            color: #4a4a4a;
+        }
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 5px;
+            border-radius: 3px;
+        }
+        .endpoint {
+            background-color: #f9f9f9;
+            padding: 10px;
+            margin: 10px 0;
+            border-left: 4px solid #8E24AA;
+        }
+        form {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #f5f5f5;
+            border-radius: 5px;
+        }
+        label, input, button {
+            display: block;
+            margin-bottom: 10px;
+        }
+        button {
+            background-color: #8E24AA;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        #result {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #e8f5e9;
+            display: none;
+        }
+        #preview {
+            max-width: 300px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Starvangaba API Server</h1>
+        <p>This is the API server for the Starvangaba run tracking app.</p>
+        
+        <h2>API Endpoints Documentation</h2>
+        <div class="endpoint">
+            <h3>Authentication</h3>
+            <p><code>POST /api/register</code> - Register a new user</p>
+            <p><code>POST /api/login</code> - Login a user</p>
+        </div>
+        
+        <div class="endpoint">
+            <h3>User Profile</h3>
+            <p><code>GET /api/profile</code> - Get user profile</p>
+            <p><code>PUT /api/profile</code> - Update user profile</p>
+            <p><code>POST /api/profile/picture</code> - Update profile picture</p>
+        </div>
+        
+        <div class="endpoint">
+            <h3>Routes</h3>
+            <p><code>POST /api/generate-route</code> - Generate a new route</p>
+            <p><code>POST /api/routes</code> - Save a route</p>
+            <p><code>GET /api/routes</code> - Get user routes</p>
+            <p><code>GET /api/routes/nearby</code> - Get routes near location</p>
+        </div>
+        
+        <div class="endpoint">
+            <h3>Activity Tracking</h3>
+            <p><code>POST /api/sessions/start</code> - Start a tracking session</p>
+            <p><code>PUT /api/sessions/update</code> - Update a session</p>
+            <p><code>POST /api/sessions/stop</code> - Stop a session and create activity</p>
+        </div>
+        
+        <h2>Profile Picture Upload Test</h2>
+        <form id="profilePictureForm" enctype="multipart/form-data">
+            <label for="token">Authentication Token:</label>
+            <input type="text" id="token" name="token" placeholder="Paste your JWT token here" required>
+            
+            <label for="profilePicture">Select Profile Picture:</label>
+            <input type="file" id="profilePicture" name="profilePicture" accept="image/*" required>
+            
+            <img id="preview" style="display: none;">
+            
+            <button type="submit">Upload Profile Picture</button>
+        </form>
+        
+        <div id="result"></div>
+    </div>
+    
+    <script>
+        // Preview selected image
+        document.getElementById('profilePicture').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const preview = document.getElementById('preview');
+                    preview.src = event.target.result;
+                    preview.style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+        
+        // Handle form submission
+        document.getElementById('profilePictureForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const token = document.getElementById('token').value;
+            const fileInput = document.getElementById('profilePicture');
+            const resultDiv = document.getElementById('result');
+            
+            if (!token || !fileInput.files[0]) {
+                resultDiv.textContent = 'Please provide both token and profile picture';
+                resultDiv.style.display = 'block';
+                resultDiv.style.backgroundColor = '#ffebee';
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('profilePicture', fileInput.files[0]);
+            
+            try {
+                const response = await fetch('/api/profile/picture', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.textContent = 'Profile picture uploaded successfully! Path: ' + data.data.profilePicture;
+                    resultDiv.style.backgroundColor = '#e8f5e9';
+                } else {
+                    resultDiv.textContent = 'Error: ' + data.message;
+                    resultDiv.style.backgroundColor = '#ffebee';
+                }
+                
+                resultDiv.style.display = 'block';
+            } catch (error) {
+                resultDiv.textContent = 'Error: ' + error.message;
+                resultDiv.style.backgroundColor = '#ffebee';
+                resultDiv.style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html> 
