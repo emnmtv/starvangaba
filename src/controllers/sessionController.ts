@@ -233,13 +233,15 @@ export const stopSession = async (req: Request, res: Response): Promise<void> =>
       elevationGain,
       averageSpeed,
       maxSpeed,
-      route
+      route,
+      simulated
     } = req.body;
     
     console.log("Stop session request data:", {
       totalDistance,
       totalDuration,
-      finalLocation
+      finalLocation,
+      simulated
     });
     
     // Find active session
@@ -322,7 +324,7 @@ export const stopSession = async (req: Request, res: Response): Promise<void> =>
         ? session.currentDuration
         : 1; // Minimal fallback value
     
-    console.log("Creating activity with distance:", finalDistance, "duration:", finalDuration);
+    console.log("Creating activity with distance:", finalDistance, "duration:", finalDuration, "simulated:", simulated);
     
     // Create a new activity from this session
     const activity = await Activity.create({
@@ -338,6 +340,7 @@ export const stopSession = async (req: Request, res: Response): Promise<void> =>
       maxSpeed: maxSpeed || session.currentSpeed || 0,
       averagePace: finalDuration / (finalDistance / 1000), // seconds per km
       calories: calculateCalories(finalDuration, req.user),
+      simulated: simulated === true, // Set simulated flag, default to false if not provided
       route: {
         type: 'LineString',
         coordinates: routeCoordinates

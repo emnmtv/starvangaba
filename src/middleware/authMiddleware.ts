@@ -54,10 +54,11 @@ export const authenticateToken = async (req: Request, res: Response, next: NextF
 // Check if user is admin
 export const isAdmin = (req: Request, res: Response, next: NextFunction) => {
   if (!req.user || req.user.role !== 'ADMIN') {
-    return res.status(403).json({ 
+  res.status(403).json({ 
       success: false, 
       message: 'Access denied. Admin role required.' 
     });
+    return;
   }
   next();
 };

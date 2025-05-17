@@ -40,6 +40,7 @@ export interface IActivity extends Document {
   maxSpeed: number; // in m/s
   averagePace: number; // in seconds per kilometer
   calories: number;
+  simulated: boolean; // indicates if the activity was simulated
   
   // Full route as LineString
   route: {
@@ -144,6 +145,9 @@ export interface IRoute extends Document {
   isPublic: boolean;
   usageCount: number;
   completed: boolean;
+  isVerified: boolean; // Whether the route is verified by an admin
+  verifiedBy?: mongoose.Types.ObjectId; // Admin who verified the route
+  verificationDate?: Date; // Date when the route was verified
   createdAt: Date;
   updatedAt: Date;
 }
@@ -194,6 +198,7 @@ const ActivitySchema: Schema = new Schema({
   maxSpeed: { type: Number }, // in m/s
   averagePace: { type: Number }, // in seconds per kilometer
   calories: { type: Number },
+  simulated: { type: Boolean, default: false }, // indicates if the activity was simulated
   
   // GeoJSON LineString for the complete route
   route: {
@@ -312,6 +317,9 @@ const RouteSchema: Schema = new Schema({
   isPublic: { type: Boolean, default: false },
   usageCount: { type: Number, default: 0 },
   completed: { type: Boolean, default: false },
+  isVerified: { type: Boolean, default: false },
+  verifiedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+  verificationDate: { type: Date },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 }, {

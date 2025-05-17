@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { Route } from '../config/database';
 import axios from 'axios';
+import mongoose from 'mongoose';
 
 interface Point {
   lat: number;
@@ -488,7 +489,7 @@ export const getUserRoutes = async (req: Request, res: Response): Promise<void> 
 
     const routes = await Route.find({ user: req.user._id })
       .sort({ createdAt: -1 })
-      .select('title description distance elevationGain startPoint endPoint path createdAt');
+      .select('title description distance elevationGain startPoint endPoint path createdAt isVerified');
 
     res.status(200).json({
       success: true,
@@ -534,8 +535,12 @@ export const getRoutesNearLocation = async (req: Request, res: Response): Promis
       },
       isPublic: true
     })
+    .populate({
+      path: 'user',
+      select: 'firstName lastName username profilePicture' // Include only basic user details
+    })
     .limit(10)
-    .select('title description distance elevationGain startPoint endPoint path createdAt');
+    .select('title description distance elevationGain startPoint endPoint path createdAt user isVerified');
 
     res.status(200).json({
       success: true,
@@ -671,6 +676,299 @@ export const getRouteById = async (req: Request, res: Response): Promise<void> =
     res.status(500).json({
       success: false,
       message: 'Server error while fetching route details'
+    });
+  }
+};
+
+// Admin: Verify a route
+export const verifyRoute = async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Check if the user is an admin
+    if (!req.user || req.user.role !== 'ADMIN') {
+      res.status(403).json({
+        success: false,
+        message: 'Access denied: Admin privileges required'
+      });
+      return;
+    }
+
+    const { routeId } = req.params;
+
+    if (!routeId) {
+      res.status(400).json({
+        success: false,
+        message: 'Route ID is required'
+      });
+      return;
+    }
+
+    // Find the route by ID
+    const route = await Route.findById(routeId);
+
+    if (!route) {
+      res.status(404).json({
+        success: false,
+        message: 'Route not found'
+      });
+      return;
+    }
+
+    // Update verification fields
+    route.isVerified = true;
+    route.verifiedBy = req.user._id;
+    route.verificationDate = new Date();
+
+    // Save the updated route
+    await route.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Route verified successfully',
+      data: route
+    });
+  } catch (error) {
+    console.error('Error verifying route:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while verifying route'
+    });
+  }
+};
+
+// Admin: Create route manually
+export const adminCreateRoute = async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Check if the user is an admin
+    if (!req.user || req.user.role !== 'ADMIN') {
+      res.status(403).json({
+        success: false,
+        message: 'Access denied: Admin privileges required'
+      });
+      return;
+    }
+
+    // Validate request body
+    const { 
+      title, 
+      description, 
+      distance,
+      elevationGain, 
+      startPoint, 
+      endPoint, 
+      path, 
+      userId,  // User ID to assign the route to (optional)
+      isPublic,
+      isVerified 
+    } = req.body;
+
+    if (!title || !distance || !startPoint || !endPoint || !path) {
+      res.status(400).json({
+        success: false,
+        message: 'Missing required fields: title, distance, startPoint, endPoint, path'
+      });
+      return;
+    }
+
+    // Validate GeoJSON format
+    if (!startPoint.coordinates || startPoint.coordinates.length !== 2 || 
+        !endPoint.coordinates || endPoint.coordinates.length !== 2 ||
+        !path.coordinates || !Array.isArray(path.coordinates) || path.coordinates.length < 2) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid GeoJSON format for startPoint, endPoint, or path'
+      });
+      return;
+    }
+
+    // Determine route owner (specified user or admin)
+    const routeOwner = userId ? userId : req.user._id;
+    
+    // Verify user exists if userId is provided
+    if (userId) {
+      const userExists = await mongoose.model('User').findById(userId);
+      if (!userExists) {
+        res.status(404).json({
+          success: false,
+          message: 'User not found'
+        });
+        return;
+      }
+    }
+
+    // Create new route
+    const newRoute = new Route({
+      title,
+      description,
+      user: routeOwner,
+      distance,
+      elevationGain: elevationGain || 0,
+      startPoint: {
+        type: 'Point',
+        coordinates: startPoint.coordinates
+      },
+      endPoint: {
+        type: 'Point',
+        coordinates: endPoint.coordinates
+      },
+      path: {
+        type: 'LineString',
+        coordinates: path.coordinates
+      },
+      isPublic: isPublic !== undefined ? isPublic : true,
+      usageCount: 0,
+      completed: false,
+      isVerified: isVerified !== undefined ? isVerified : true,
+      verifiedBy: req.user._id,
+      verificationDate: new Date()
+    });
+
+    // Save the new route
+    await newRoute.save();
+
+    res.status(201).json({
+      success: true,
+      message: 'Route created successfully',
+      data: newRoute
+    });
+  } catch (error) {
+    console.error('Error creating route:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while creating route'
+    });
+  }
+};
+
+// Add a new function to get routes pending verification for admins
+export const getPendingRoutes = async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Only allow admin users
+    if (req.user.role !== 'ADMIN') {
+      res.status(403).json({ success: false, message: 'Access denied: Admin privileges required' });
+      return;
+    }
+    
+    // Get all routes that are not verified yet
+    const routes = await Route.find({ isVerified: false })
+      .populate('user', 'username firstName lastName email')
+      .sort({ createdAt: -1 });
+    
+    res.status(200).json({
+      success: true,
+      count: routes.length,
+      data: routes
+    });
+  } catch (error) {
+    console.error('Error getting pending routes:', error);
+    res.status(500).json({ success: false, message: 'Server error while fetching pending routes' });
+  }
+};
+
+export const getAllRoutes = async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Only allow admin users
+    if (req.user.role !== 'ADMIN') {
+      res.status(403).json({ success: false, message: 'Access denied: Admin privileges required' });
+      return;
+    }
+    
+    // Get all routes with their user information
+    const routes = await Route.find({})
+      .populate('user', 'username firstName lastName email')
+      .sort({ createdAt: -1 });
+    
+    res.status(200).json({
+      success: true,
+      count: routes.length,
+      data: routes
+    });
+  } catch (error) {
+    console.error('Error getting all routes:', error);
+    res.status(500).json({ success: false, message: 'Server error while fetching routes' });
+  }
+};
+
+// User: Create route manually (similar to admin create but for regular users)
+export const userCreateRoute = async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Ensure user is authenticated
+    if (!req.user) {
+      res.status(401).json({
+        success: false,
+        message: 'Authentication required'
+      });
+      return;
+    }
+
+    // Validate request body
+    const { 
+      title, 
+      description, 
+      distance,
+      elevationGain, 
+      startPoint, 
+      endPoint, 
+      path, 
+      isPublic
+    } = req.body;
+
+    if (!title || !distance || !startPoint || !endPoint || !path) {
+      res.status(400).json({
+        success: false,
+        message: 'Missing required fields: title, distance, startPoint, endPoint, path'
+      });
+      return;
+    }
+
+    // Validate GeoJSON format
+    if (!startPoint.coordinates || startPoint.coordinates.length !== 2 || 
+        !endPoint.coordinates || endPoint.coordinates.length !== 2 ||
+        !path.coordinates || !Array.isArray(path.coordinates) || path.coordinates.length < 2) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid GeoJSON format for startPoint, endPoint, or path'
+      });
+      return;
+    }
+
+    // Create new route
+    const newRoute = new Route({
+      title,
+      description: description || `Route created on ${new Date().toLocaleDateString()}`,
+      user: req.user._id,
+      distance,
+      elevationGain: elevationGain || 0,
+      startPoint: {
+        type: 'Point',
+        coordinates: startPoint.coordinates
+      },
+      endPoint: {
+        type: 'Point',
+        coordinates: endPoint.coordinates
+      },
+      path: {
+        type: 'LineString',
+        coordinates: path.coordinates
+      },
+      isPublic: isPublic !== undefined ? isPublic : true,
+      usageCount: 0,
+      completed: false,
+      isVerified: false // User-created routes are not verified by default
+    });
+
+    // Save the new route
+    await newRoute.save();
+
+    res.status(201).json({
+      success: true,
+      message: 'Route created successfully',
+      data: newRoute
+    });
+  } catch (error) {
+    console.error('Error creating route:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while creating route'
     });
   }
 }; 

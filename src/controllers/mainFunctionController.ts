@@ -314,3 +314,59 @@ export const updateProfilePicture = async (req: Request, res: Response): Promise
     });
   }
 };
+
+export const adminLogin = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      res.status(400).json({ success: false, message: 'Please provide email and password' });
+      return;
+    }
+
+    // Check if user exists
+    const user = await User.findOne({ email }) as IUser | null;
+    if (!user) {
+      res.status(401).json({ success: false, message: 'Invalid credentials' });
+      return;
+    }
+
+    // Verify password
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      res.status(401).json({ success: false, message: 'Invalid credentials' });
+      return;
+    }
+
+    // Check if user is an admin
+    if (user.role !== 'ADMIN') {
+      res.status(403).json({ success: false, message: 'Access denied: Admin privileges required' });
+      return;
+    }
+    // User is valid and has admin privileges, generate token
+    const token = generateToken(user._id!.toString());
+
+    res.status(200).json({
+      success: true,
+      message: 'Admin login successful',
+      data: {
+        token,
+        user: {
+          id: user._id,
+          username: user.username,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          role: user.role,
+          profilePicture: user.profilePicture
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Admin login error:', error);
+    res.status(500).json({ success: false, message: 'Server error during admin login' });
+  }
+};
+
+
+

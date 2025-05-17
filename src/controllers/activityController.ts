@@ -13,7 +13,7 @@ export const getUserActivities = async (req: Request, res: Response): Promise<vo
     }
 
     // Extract query parameters for filtering and pagination
-    const { limit = 10, skip = 0, sort = '-startTime', type } = req.query;
+    const { limit = 10, skip = 0, sort = '-startTime', type, simulated } = req.query;
     
     // Build query
     const query: any = { user: req.user._id };
@@ -23,12 +23,19 @@ export const getUserActivities = async (req: Request, res: Response): Promise<vo
       query.type = type;
     }
 
+    // Add simulation filter if specified
+    if (simulated === 'true') {
+      query.simulated = true;
+    } else if (simulated === 'false') {
+      query.simulated = false;
+    }
+
     // Execute query with pagination and sorting
     const activities = await Activity.find(query)
       .sort(sort as string)
       .skip(parseInt(skip as string))
       .limit(parseInt(limit as string))
-      .select('title description type startTime endTime duration distance elevationGain averageSpeed route privacy');
+      .select('title description type startTime endTime duration distance elevationGain averageSpeed route privacy simulated');
 
     // Get total count for pagination
     const total = await Activity.countDocuments(query);
