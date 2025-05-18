@@ -462,6 +462,18 @@ export const saveRoute = async (req: Request, res: Response): Promise<void> => {
       completed: completed || false
     });
 
+    // Increment user's routesCount
+    try {
+      await mongoose.model('User').findByIdAndUpdate(
+        req.user._id,
+        { $inc: { routesCount: 1 } }
+      );
+      console.log(`Incremented routes count for user: ${req.user._id}`);
+    } catch (updateError) {
+      console.error('Error updating user routes count:', updateError);
+      // Continue even if the update fails
+    }
+
     res.status(201).json({
       success: true,
       message: 'Route saved successfully',
@@ -969,6 +981,164 @@ export const userCreateRoute = async (req: Request, res: Response): Promise<void
     res.status(500).json({
       success: false,
       message: 'Server error while creating route'
+    });
+  }
+};
+
+// Delete a route by ID
+export const deleteRoute = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({
+        success: false,
+        message: 'User not authenticated'
+      });
+      return;
+    }
+
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid route ID'
+      });
+      return;
+    }
+
+    // Find the route
+    const route = await Route.findById(id);
+
+    if (!route) {
+      res.status(404).json({
+        success: false,
+        message: 'Route not found'
+      });
+      return;
+    }
+
+    // Check if the user owns the route or is an admin
+    if (route.user.toString() !== req.user._id.toString() && req.user.role !== 'ADMIN') {
+      res.status(403).json({
+        success: false,
+        message: 'You do not have permission to delete this route'
+      });
+      return;
+    }
+
+    // Check if route is used in any activities before deletion
+    const routeInUse = await mongoose.model('Activity').exists({
+      'route.coordinates': { $elemMatch: { $elemMatch: { $all: route.path.coordinates[0] } } }
+    });
+
+    if (routeInUse) {
+      res.status(400).json({
+        success: false,
+        message: 'Cannot delete route that has been used in activities'
+      });
+      return;
+    }
+
+    // Delete the route
+    await Route.findByIdAndDelete(id);
+
+    // Decrement user's routesCount if this user created the route
+    if (route.user.toString() === req.user._id.toString()) {
+      try {
+        await mongoose.model('User').findByIdAndUpdate(
+          req.user._id,
+          { $inc: { routesCount: -1 } }
+        );
+        console.log(`Decremented routes count for user: ${req.user._id}`);
+      } catch (updateError) {
+        console.error('Error updating user routes count:', updateError);
+        // Continue even if the update fails
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Route deleted successfully'
+    });
+  } catch (error) {
+    console.error('Delete route error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while deleting route'
+    });
+  }
+};
+
+// Update route details by ID
+export const updateRoute = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({
+        success: false,
+        message: 'User not authenticated'
+      });
+      return;
+    }
+
+    const { id } = req.params;
+    const { title, description, isPublic } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid route ID'
+      });
+      return;
+    }
+
+    // Find the route to check ownership
+    const route = await Route.findById(id);
+
+    if (!route) {
+      res.status(404).json({
+        success: false,
+        message: 'Route not found'
+      });
+      return;
+    }
+
+    // Check if the user owns the route or is an admin
+    if (route.user.toString() !== req.user._id.toString() && req.user.role !== 'ADMIN') {
+      res.status(403).json({
+        success: false,
+        message: 'You do not have permission to update this route'
+      });
+      return;
+    }
+
+    // Create an object with the fields to update
+    const updateData: any = {};
+    
+    // Only include fields that are provided in the request
+    if (title !== undefined) updateData.title = title;
+    if (description !== undefined) updateData.description = description;
+    if (isPublic !== undefined) updateData.isPublic = isPublic;
+    
+    // Add updated timestamp
+    updateData.updatedAt = new Date();
+
+    // Update the route
+    const updatedRoute = await Route.findByIdAndUpdate(
+      id,
+      { $set: updateData },
+      { new: true } // Return the updated document
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Route updated successfully',
+      data: updatedRoute
+    });
+  } catch (error) {
+    console.error('Update route error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while updating route'
     });
   }
 }; 

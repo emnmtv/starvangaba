@@ -14,6 +14,9 @@ export interface IUser extends Document {
   weight?: number; // Weight in kg
   height?: number; // Height in cm
   age?: number; // Age in years
+  totalDistance?: number; // Total distance in meters
+  routesCount?: number; // Count of routes created
+  averagePace?: number; // Average pace in seconds per kilometer
   followers: mongoose.Types.ObjectId[];
   following: mongoose.Types.ObjectId[];
   activityPreferences: {
@@ -23,6 +26,14 @@ export interface IUser extends Document {
   };
   createdAt: Date;
   updatedAt: Date;
+}
+
+// Weight history interface for tracking weight changes over time
+export interface IWeightHistory extends Document {
+  user: mongoose.Types.ObjectId;
+  weight: number; // Weight in kg
+  date: Date;
+  note?: string; // Optional note about the weight entry
 }
 
 // Activity interface
@@ -40,6 +51,7 @@ export interface IActivity extends Document {
   maxSpeed: number; // in m/s
   averagePace: number; // in seconds per kilometer
   calories: number;
+  steps: number; // number of steps taken
   simulated: boolean; // indicates if the activity was simulated
   
   // Full route as LineString
@@ -81,6 +93,10 @@ export interface IActivity extends Document {
     text: string;
     createdAt: Date;
   }[];
+  
+  // Archive fields
+  archived?: boolean;
+  archivedAt?: Date;
   
   createdAt: Date;
   updatedAt: Date;
@@ -165,6 +181,9 @@ const UserSchema: Schema = new Schema({
   weight: { type: Number }, // Weight in kg
   height: { type: Number }, // Height in cm
   age: { type: Number }, // Age in years
+  totalDistance: { type: Number, default: 0 }, // Total distance in meters
+  routesCount: { type: Number, default: 0 }, // Count of routes created
+  averagePace: { type: Number }, // Average pace in seconds per kilometer
   followers: [{ type: Schema.Types.ObjectId, ref: 'User' }],
   following: [{ type: Schema.Types.ObjectId, ref: 'User' }],
   activityPreferences: {
@@ -174,6 +193,16 @@ const UserSchema: Schema = new Schema({
   },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
+}, {
+  timestamps: true
+});
+
+// Weight History Schema
+const WeightHistorySchema: Schema = new Schema({
+  user: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+  weight: { type: Number, required: true }, // Weight in kg
+  date: { type: Date, default: Date.now, index: true },
+  note: { type: String }
 }, {
   timestamps: true
 });
@@ -198,6 +227,7 @@ const ActivitySchema: Schema = new Schema({
   maxSpeed: { type: Number }, // in m/s
   averagePace: { type: Number }, // in seconds per kilometer
   calories: { type: Number },
+  steps: { type: Number, default: 0 }, // number of steps taken
   simulated: { type: Boolean, default: false }, // indicates if the activity was simulated
   
   // GeoJSON LineString for the complete route
@@ -245,6 +275,10 @@ const ActivitySchema: Schema = new Schema({
     text: { type: String, required: true },
     createdAt: { type: Date, default: Date.now }
   }],
+  
+  // Archive fields
+  archived: { type: Boolean },
+  archivedAt: { type: Date },
   
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
@@ -340,11 +374,13 @@ export const Activity: Model<IActivity> = mongoose.model<IActivity>('Activity', 
 export const ActiveSession: Model<IActiveSession> = mongoose.model<IActiveSession>('ActiveSession', ActiveSessionSchema);
 export const Challenge: Model<IChallenge> = mongoose.model<IChallenge>('Challenge', ChallengeSchema);
 export const Route: Model<IRoute> = mongoose.model<IRoute>('Route', RouteSchema);
+export const WeightHistory: Model<IWeightHistory> = mongoose.model<IWeightHistory>('WeightHistory', WeightHistorySchema);
 
 export default {
   User,
   Activity,
   ActiveSession,
   Challenge,
-  Route
+  Route,
+  WeightHistory
 };

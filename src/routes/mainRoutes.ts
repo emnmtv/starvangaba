@@ -1,5 +1,15 @@
 import express from 'express';
-import { registerUser, loginUser, updateUserProfile, updateProfilePicture, adminLogin } from '../controllers/mainFunctionController';
+import {
+   registerUser, 
+  loginUser,
+   updateUserProfile,
+    updateProfilePicture, 
+    adminLogin,
+     updatePrivacySettings,
+      addWeightEntry,
+       getWeightHistory,
+       recalculateUserTotalDistance
+       } from '../controllers/mainFunctionController';
 import { 
   generateRouteNearUser, 
   saveRoute, 
@@ -10,7 +20,9 @@ import {
   adminCreateRoute,
   getPendingRoutes,
   getAllRoutes,
-  userCreateRoute
+  userCreateRoute,
+  deleteRoute,
+  updateRoute
 } from '../controllers/routeController';
 import { 
   startSession,
@@ -21,8 +33,23 @@ import {
 } from '../controllers/sessionController';
 import {
   getUserActivities,
-  getActivityById
+  getActivityById,
+  getUserStats,
+  archiveActivity,
+  restoreActivity,
+  getArchivedActivities
 } from '../controllers/activityController';
+import {
+  createChallenge,
+  getAllChallenges,
+  getChallengeById,
+  updateChallenge,
+  deleteChallenge,
+  joinChallenge,
+  leaveChallenge,
+  getUserChallenges,
+  getChallengeLeaderboard
+} from '../controllers/challengeController';
 import { authenticateToken, isAdmin } from '../middleware/authMiddleware';
 import { uploadProfilePicture } from '../middleware/fileHandler';
 
@@ -47,13 +74,24 @@ router.get('/profile', authenticateToken, (req, res) => {
 router.put('/profile', authenticateToken, updateUserProfile);
 // Add the new profile picture upload route
 router.post('/profile/picture', authenticateToken, uploadProfilePicture, updateProfilePicture);
+// Add privacy settings update route
+router.put('/profile/privacy', authenticateToken, updatePrivacySettings);
+
+// Weight tracking routes
+router.post('/profile/weight', authenticateToken, addWeightEntry);
+router.get('/profile/weight/history', authenticateToken, getWeightHistory);
+
+// Distance recalculation route
+router.post('/profile/distance/recalculate', authenticateToken, recalculateUserTotalDistance);
 
 // Route generation and management
 router.post('/generate-route', authenticateToken, generateRouteNearUser);
 router.post('/routes', authenticateToken, saveRoute);
 router.get('/routes', authenticateToken, getUserRoutes);
-router. get('/routes/nearby', getRoutesNearLocation);
+router.get('/routes/nearby', getRoutesNearLocation);
 router.get('/routes/:id', authenticateToken, getRouteById);
+router.put('/routes/:id', authenticateToken, updateRoute);
+router.delete('/routes/:id', authenticateToken, deleteRoute);
 
 // Admin route endpoints
 router.get('/admin/routes/pending', authenticateToken, isAdmin, getPendingRoutes);
@@ -62,8 +100,14 @@ router.post('/admin/routes/verify/:routeId', authenticateToken, isAdmin, verifyR
 router.post('/admin/routes/create', authenticateToken, isAdmin, adminCreateRoute);
 
 // Activity routes
-router.get('/activities', authenticateToken, getUserActivities);
+router.get('/activities/stats/summary', authenticateToken, getUserStats);
+router.get('/activities/archived', authenticateToken, getArchivedActivities);
 router.get('/activities/:id', authenticateToken, getActivityById);
+router.get('/activities', authenticateToken, getUserActivities);
+
+// Activity archive routes
+router.put('/activities/:id/archive', authenticateToken, archiveActivity);
+router.put('/activities/:id/restore', authenticateToken, restoreActivity);
 
 // Session tracking routes
 router.post('/sessions/start', authenticateToken, startSession);
@@ -74,5 +118,19 @@ router.post('/sessions/reset', authenticateToken, resetSession);
 
 // Add the route endpoint for regular users to create routes manually
 router.post('/routes/create', authenticateToken, userCreateRoute);
+
+// Challenge routes
+// Admin challenge management
+router.post('/admin/challenges', authenticateToken, isAdmin, createChallenge);
+router.put('/admin/challenges/:id', authenticateToken, isAdmin, updateChallenge);
+router.delete('/admin/challenges/:id', authenticateToken, isAdmin, deleteChallenge);
+router.get('/admin/challenges/leaderboard/:id', authenticateToken, isAdmin, getChallengeLeaderboard);
+
+// Public challenge endpoints
+router.get('/challenges', authenticateToken, getAllChallenges);
+router.get('/challenges/:id', authenticateToken, getChallengeById);
+router.post('/challenges/:id/join', authenticateToken, joinChallenge);
+router.post('/challenges/:id/leave', authenticateToken, leaveChallenge);
+router.get('/user/challenges', authenticateToken, getUserChallenges);
 
 export default router; 

@@ -5,6 +5,7 @@ import { generateToken } from '../middleware/authMiddleware';
 import mongoose from 'mongoose';
 import path from 'path';
 import fs from 'fs';
+import { WeightHistory, Activity } from '../config/database';
 
 // User registration controller
 export const registerUser = async (req: Request, res: Response): Promise<void> => {
@@ -189,12 +190,29 @@ export const updateUserProfile = async (req: Request, res: Response): Promise<vo
 
     // Prepare the update object with only fields that are provided
     const updateData: any = {};
-    if (weight !== undefined) updateData.weight = weight;
     if (height !== undefined) updateData.height = height;
     if (age !== undefined) updateData.age = age;
     if (firstName) updateData.firstName = firstName;
     if (lastName) updateData.lastName = lastName;
     if (bio !== undefined) updateData.bio = bio;
+    
+    // Add weight to the update data, but also track it in the weight history collection
+    if (weight !== undefined) {
+      updateData.weight = weight;
+      
+      // Record weight in the weight history collection
+      try {
+        await WeightHistory.create({
+          user: req.user._id,
+          weight: weight,
+          date: new Date()
+        });
+        console.log(`Recorded weight history entry for user ${req.user._id}: ${weight}kg`);
+      } catch (weightHistoryError) {
+        console.error('Error recording weight history:', weightHistoryError);
+        // Continue even if weight history recording fails
+      }
+    }
 
     // Update user profile
     const updatedUser = await User.findByIdAndUpdate(
@@ -221,6 +239,103 @@ export const updateUserProfile = async (req: Request, res: Response): Promise<vo
     res.status(500).json({
       success: false,
       message: 'Server error while updating profile'
+    });
+  }
+};
+
+// Add a specific weight entry without updating the current profile weight
+export const addWeightEntry = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({
+        success: false,
+        message: 'User not authenticated'
+      });
+      return;
+    }
+
+    const { weight, date, note } = req.body;
+    
+    // Validate weight
+    if (!weight || isNaN(weight) || weight <= 0 || weight > 300) {
+      res.status(400).json({
+        success: false,
+        message: 'Weight must be a positive number between 1 and 300 kg'
+      });
+      return;
+    }
+    
+    // Create a new weight history entry
+    const weightEntry = await WeightHistory.create({
+      user: req.user._id,
+      weight,
+      date: date ? new Date(date) : new Date(),
+      note: note || ''
+    });
+    
+    // Also update the current weight on the user profile
+    await User.findByIdAndUpdate(
+      req.user._id,
+      { $set: { weight } }
+    );
+    
+    res.status(201).json({
+      success: true,
+      message: 'Weight entry added successfully',
+      data: weightEntry
+    });
+  } catch (error) {
+    console.error('Add weight entry error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while adding weight entry'
+    });
+  }
+};
+
+// Get weight history for the current user
+export const getWeightHistory = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({
+        success: false,
+        message: 'User not authenticated'
+      });
+      return;
+    }
+    
+    // Extract query parameters for date filtering
+    const { startDate, endDate, limit = 100 } = req.query;
+    
+    // Build query
+    const query: any = { user: req.user._id };
+    
+    if (startDate || endDate) {
+      query.date = {};
+      if (startDate) {
+        query.date.$gte = new Date(startDate as string);
+      }
+      if (endDate) {
+        query.date.$lte = new Date(endDate as string);
+      }
+    }
+    
+    // Get weight history entries
+    const weightEntries = await WeightHistory.find(query)
+      .sort({ date: -1 })
+      .limit(parseInt(limit as string))
+      .select('weight date note createdAt');
+    
+    res.status(200).json({
+      success: true,
+      count: weightEntries.length,
+      data: weightEntries
+    });
+  } catch (error) {
+    console.error('Get weight history error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while fetching weight history'
     });
   }
 };
@@ -365,6 +480,150 @@ export const adminLogin = async (req: Request, res: Response): Promise<void> => 
   } catch (error) {
     console.error('Admin login error:', error);
     res.status(500).json({ success: false, message: 'Server error during admin login' });
+  }
+};
+
+// Update user privacy settings
+export const updatePrivacySettings = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({
+        success: false,
+        message: 'User not authenticated'
+      });
+      return;
+    }
+
+    const { privacyDefault, distanceUnit, paceUnit } = req.body;
+    
+    // Validate privacy settings
+    if (privacyDefault && !['public', 'followers', 'private'].includes(privacyDefault)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid privacy setting. Must be "public", "followers", or "private"'
+      });
+      return;
+    }
+    
+    // Validate distance unit
+    if (distanceUnit && !['km', 'miles'].includes(distanceUnit)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid distance unit. Must be "km" or "miles"'
+      });
+      return;
+    }
+    
+    // Validate pace unit
+    if (paceUnit && !['min/km', 'min/mile'].includes(paceUnit)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid pace unit. Must be "min/km" or "min/mile"'
+      });
+      return;
+    }
+
+    // Prepare the update object with only fields that are provided
+    const updateData: any = { activityPreferences: {} };
+    
+    // Only include fields that were actually provided in the request
+    if (privacyDefault) updateData.activityPreferences.privacyDefault = privacyDefault;
+    if (distanceUnit) updateData.activityPreferences.distanceUnit = distanceUnit;
+    if (paceUnit) updateData.activityPreferences.paceUnit = paceUnit;
+
+    // Update user preferences
+    const updatedUser = await User.findByIdAndUpdate(
+      req.user._id,
+      { $set: updateData },
+      { new: true, runValidators: true }
+    ).select('-password');
+
+    if (!updatedUser) {
+      res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Privacy settings updated successfully',
+      data: {
+        activityPreferences: updatedUser.activityPreferences
+      }
+    });
+  } catch (error) {
+    console.error('Update privacy settings error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while updating privacy settings'
+    });
+  }
+};
+
+// Recalculate user total distance based on all activities
+export const recalculateUserTotalDistance = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({
+        success: false,
+        message: 'User not authenticated'
+      });
+      return;
+    }
+
+    // Get the user's ID
+    const userId = req.user._id;
+    console.log(`Recalculating total distance for user: ${userId}`);
+
+    // Sum all distances from activities
+    const result = await Activity.aggregate([
+      { 
+        $match: { 
+          user: new mongoose.Types.ObjectId(userId.toString())
+        } 
+      },
+      {
+        $group: {
+          _id: null,
+          totalDistance: { $sum: '$distance' }
+        }
+      }
+    ]);
+
+    // Get the total distance or default to 0
+    let totalDistance = result.length > 0 ? result[0].totalDistance : 0;
+    
+    // Check if values are likely in kilometers instead of meters
+    if (totalDistance < 100) {  // If less than 100 meters, likely the values are in km
+      totalDistance = totalDistance * 1000;  // Convert to meters
+      console.log(`Converting from km to meters: ${totalDistance} meters`);
+    }
+    
+    console.log(`Final calculated total distance: ${totalDistance} meters`);
+
+    // Update the user's totalDistance field
+    await User.findByIdAndUpdate(
+      userId,
+      { $set: { totalDistance: totalDistance } }
+    );
+
+    // Return success response
+    res.status(200).json({
+      success: true,
+      message: 'Total distance recalculated successfully',
+      data: {
+        totalDistance: totalDistance,
+        totalDistanceKm: (totalDistance / 1000).toFixed(2)
+      }
+    });
+  } catch (error) {
+    console.error('Recalculate total distance error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while recalculating total distance'
+    });
   }
 };
 
